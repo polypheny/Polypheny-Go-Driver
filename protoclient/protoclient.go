@@ -27,6 +27,11 @@ type ProtoClient struct {
         responseStreamUnprepared protos.ProtoInterface_ExecuteUnparameterizedStatementClient
 }
 
+type PolyphenyKeyValuePair struct {
+	key interface{}
+	value interface{}
+}
+
 func newClient(address string) *ProtoClient {
 	clientUUID := uuid.New().String()
         conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -143,10 +148,10 @@ func (c *ProtoClient) FetchResult() [][]interface{} {
         }
         rawdata := result.GetResult()
         frame := rawdata.GetFrame()
+	var values [][]interface{} // return values
 	if rawdata.GetScalar() == 0 {
                 if len(frame.GetRelationalFrame().GetRows()) != 0 {
                         rows := frame.GetRelationalFrame().GetRows()
-                        var values [][]interface{}
                         var currentRow []interface{}
                         for _, v := range rows {
                                 currentRow = []interface{}{}
@@ -157,7 +162,19 @@ func (c *ProtoClient) FetchResult() [][]interface{} {
                         }
                         return values
                 } else if len(frame.GetDocumentFrame().GetDocuments()) != 0{
-                        return nil//frame.GetDocumentFrame()
+			documents := frame.GetDocumentFrame().GetDocuments()
+			var kv PolyphenyKeyValuePair
+			var currentDocument []interface{}
+			for _, entries := range documents {
+				currentDocument = []interface{}{}
+				for _, v := range entries.GetEntries() {
+					kv.key = convertValues( *(v.GetKey()) )
+					kv.value = convertValues( *(v.GetValue()) )
+					currentDocument = append(currentDocument, kv)
+				}
+				values = append(values, currentDocument)
+			}
+			return values
                 } else {
                         return nil//frame.GetGraphFrame()
                 }
