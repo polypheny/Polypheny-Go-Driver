@@ -12,7 +12,7 @@
 
 A Polypheny-DB Driver for Go's [database/sql](https://golang.org/pkg/database/sql/) package.
 
--------------------------
+
 ## Installation
 
 ...
@@ -20,11 +20,11 @@ A Polypheny-DB Driver for Go's [database/sql](https://golang.org/pkg/database/sq
 An in-depth and more detailed documentation can be found [here](https://docs.polypheny.com/en/latest/drivers/go/overview).
 
 
--------------------------
+
 ## Roadmap
 See the [open issues](https://github.com/polypheny/Polypheny-DB/labels/A-golang) for a list of proposed features (and known issues).
 
--------------------------
+
 ## Contributing
 We highly welcome your contributions to the _Polypheny Go Driver_. If you would like to contribute, please fork the repository and submit your changes as a pull request. Please consult our [Admin Repository](https://github.com/polypheny/Admin) and our [Website](https://polypheny.org) for guidelines and additional information.
 
@@ -32,6 +32,6 @@ Please note that we have a [code of conduct](https://github.com/polypheny/Admin/
 
 
 
--------------------------
+
 ## License
 The Apache 2.0 License
