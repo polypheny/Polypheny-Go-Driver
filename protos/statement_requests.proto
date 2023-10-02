@@ -3,7 +3,7 @@ syntax = "proto3";
 import "value.proto";
 
 option java_multiple_files = true;
-option java_package = "org.polypheny.jdbc.proto";
+option java_package = "org.polypheny.db.protointerface.proto";
 option java_outer_classname = "StatementRequests";
 option go_package = "polypheny.com/protos";
 
@@ -27,7 +27,7 @@ message PrepareStatementRequest {
 }
 
 message ExecuteIndexedStatementRequest {
-  int32 statementId = 1;
+  int32 statement_id = 1;
   IndexedParameters parameters = 2;
   optional int32 fetch_size = 3;
 }
@@ -38,7 +38,7 @@ message ExecuteIndexedStatementBatchRequest {
 }
 
 message ExecuteNamedStatementRequest {
-  int32 statementId = 1;
+  int32 statement_id = 1;
   NamedParameters parameters = 2;
   optional int32 fetch_size = 3;
 }
@@ -57,5 +57,5 @@ message CloseStatementRequest {
 
 message FetchRequest {
   int32 statement_id = 1;
-  optional int32 fetchSize = 2;
+  optional int32 fetch_size = 2;
 }

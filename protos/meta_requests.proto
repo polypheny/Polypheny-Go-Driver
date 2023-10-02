@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 option java_multiple_files = true;
-option java_package = "org.polypheny.jdbc.proto";
+option java_package = "org.polypheny.db.protointerface.proto";
 option java_outer_classname = "MetaRequests";
 option go_package = "polypheny.com/protos";
 
@@ -51,6 +51,6 @@ message ClientInfoPropertyMetaRequest {
 }
 
 message FunctionsRequest {
-  string queryLanguage = 1;
-  string functionCategory = 2;
+  string query_language = 1;
+  string function_category = 2;
 }

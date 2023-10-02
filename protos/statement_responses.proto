@@ -5,7 +5,7 @@ import "graph_frame.proto";
 import "document_frame.proto";
 
 option java_multiple_files = true;
-option java_package = "org.polypheny.jdbc.proto";
+option java_package = "org.polypheny.db.protointerface.proto";
 option java_outer_classname = "StatementResponses";
 option go_package = "polypheny.com/protos";
 
@@ -43,7 +43,7 @@ message CloseStatementResponse {
 }
 
 message Frame {
-  bool isLast = 1;
+  bool is_last = 1;
   oneof result {
     RelationalFrame relational_frame = 2;
     GraphFrame graph_frame = 3;

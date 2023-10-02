@@ -1,7 +1,7 @@
 package polypheny
 
 import (
-	protoclient "github.com/polypheny/Polypheny-Go-Driver"
+	protoclient "github.com/polypheny/Polypheny-Go-Driver/protoclient"
 )
 
 type Connection struct {

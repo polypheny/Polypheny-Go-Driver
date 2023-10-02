@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 option java_multiple_files = true;
-option java_package = "org.polypheny.jdbc.proto";
+option java_package = "org.polypheny.db.protointerface.proto";
 option java_outer_classname = "MetaResponses";
 option go_package = "polypheny.com/protos";
 
@@ -94,15 +94,14 @@ message ClientInfoProperties {
 }
 
 message ClientInfoPropertiesResponse {
-//WTF?!
 }
 
 message ClientInfoPropertyMetaResponse {
-  repeated ClientInfoPropertyMeta clientInfoPropertyMetas = 1;
+  repeated ClientInfoPropertyMeta client_info_property_metas = 1;
 }
 
 message ClientInfoPropertyMeta {
-  string key = 1;;
+  string key = 1;
   string default_value = 2;
   int32 maxlength = 3;
   string description = 4;
