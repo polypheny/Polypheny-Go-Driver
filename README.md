@@ -10,7 +10,7 @@
 # Polypheny-DB Go Driver
 
 
-A Polypheny-DB Driver for Go's [database/sql](https://golang.org/pkg/database/sql/) package.
+A Polypheny-DB Driver for the Go programming language.
 
 
 ## Installation
@@ -20,6 +20,8 @@ To use this driver in a Go project, simply import the package.
 `import "github.com/polypheny/Polypheny-Go-Driver"`.
 
 However, currently the proto files are not hosted at [Polypheny](https://polypheny.com). Instead, they are included in this repo. Therefore, before build a Go project, we need to run `go mod edit -replace polypheny.com/protos=ProtoPath`. 
+
+A demo can be found [here](https://github.com/vlowingkloude/polygo).
 
 An in-depth and more detailed documentation can be found [here](https://docs.polypheny.com/en/latest/drivers/go/overview).
 
