@@ -1,14 +1,14 @@
 package protoclient
 
 import (
-	"polypheny.com/protos"
-	"github.com/google/uuid"
-        "context"
-        "google.golang.org/grpc"
+	protos "polypheny.com/protos"
+	uuid "github.com/google/uuid"
+        context "context"
+        grpc "google.golang.org/grpc"
         "google.golang.org/grpc/credentials/insecure"
         "google.golang.org/grpc/metadata"
-        "log"
-        "time"
+        log "log"
+        time "time"
 )
 
 const (
