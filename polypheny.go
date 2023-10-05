@@ -1,17 +1,13 @@
 package polypheny
 
-import (
-	protoclient "github.com/polypheny/Polypheny-Go-Driver/protoclient"
-)
-
 type Connection struct {
 	address string
 	isOpen bool
-	client *protoclient.ProtoClient
+	client *protoClient
 }
 
 func Connect(address string) *Connection {
-	client := protoclient.Connect(address)
+	client := connect(address)
 	conn := Connection {
 		address: address,
 		isOpen: true,
@@ -21,17 +17,17 @@ func Connect(address string) *Connection {
 }
 
 func (conn *Connection) Execute(statement string, language string) {
-	_ = conn.client.ExecuteUnprepared(statement, language)
+	_ = conn.client.handleExecuteUnprepared(statement, language)
 }
 
 func (conn *Connection) Fetch() [][]interface{} {
-	return conn.client.FetchResult()
+	return conn.client.handleFetchResult()
 }
 
 func (conn *Connection) Commit() {
-	conn.client.Commit()
+	conn.client.handleCommitRequest()
 }
 
 func (conn *Connection) Close() {
-	conn.client.Close()
+	conn.client.close()
 }

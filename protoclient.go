@@ -1,4 +1,4 @@
-package protoclient
+package polypheny
 
 import (
 	protos "polypheny.com/protos"
@@ -12,11 +12,15 @@ import (
 )
 
 const (
-        MajorApiVersion = 2
-        MinorApiVersion = 0
+        majorApiVersion = 2
+        minorApiVersion = 0
 )
 
-type ProtoClient struct {
+func getServerProtoAPIVersion() [2]int {
+	return [2]int{majorApiVersion, minorApiVersion}
+}
+
+type protoClient struct {
         address string
         clientUUID string
         connection *grpc.ClientConn
@@ -27,12 +31,12 @@ type ProtoClient struct {
         responseStreamUnprepared protos.ProtoInterface_ExecuteUnparameterizedStatementClient
 }
 
-type PolyphenyKeyValuePair struct {
+type polyphenyKeyValuePair struct {
 	key interface{}
 	value interface{}
 }
 
-func newClient(address string) *ProtoClient {
+func newProtoClient(address string) *protoClient {
 	clientUUID := uuid.New().String()
         conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
         if err != nil {
@@ -41,7 +45,7 @@ func newClient(address string) *ProtoClient {
         c := protos.NewProtoInterfaceClient(conn)
         ctx, cancel := context.WithTimeout(context.Background(), time.Second)
         ctx = metadata.AppendToOutgoingContext(ctx, "clientUUID", clientUUID)
-        client := ProtoClient{
+        client := protoClient{
                 address: address,
                 clientUUID: clientUUID,
                 connection: conn,
@@ -54,25 +58,25 @@ func newClient(address string) *ProtoClient {
 	return &client
 }
 
-func Connect(address string) *ProtoClient {
-	client := newClient(address)
+func connect(address string) *protoClient {
+	client := newProtoClient(address)
         request := protos.ConnectionRequest{
-                MajorApiVersion: MajorApiVersion,
-                MinorApiVersion: MinorApiVersion,
+                MajorApiVersion: majorApiVersion,
+                MinorApiVersion: minorApiVersion,
                 ClientUuid: client.clientUUID,
         }
 	response, err := client.client.Connect(client.ctx, &request)
         if err != nil {
-                log.Fatalf("could not connect: %v", err)
+                log.Fatalf("Failed to connect: %v", err)
         }
         if response.GetIsCompatible() != true {
-                log.Fatalf("could not connect")
+                log.Fatalf("The API version is not compatible with server")
         }
 	client.isConnected = true
         return client
 }
 
-func (c *ProtoClient) Close() {
+func (c *protoClient) close() {
         request := protos.DisconnectRequest{}
         _, err := c.client.Disconnect(c.ctx, &request)
         if err != nil {
@@ -83,7 +87,7 @@ func (c *ProtoClient) Close() {
         c.isConnected = false
 }
 
-func (c *ProtoClient) Commit() {
+func (c *protoClient) handleCommitRequest() {
 	request := protos.CommitRequest{}
 	_, err := c.client.CommitTransaction(c.ctx, &request)
 	if err != nil {
@@ -91,7 +95,7 @@ func (c *ProtoClient) Commit() {
         }
 }
 
-func (c *ProtoClient) ExecuteUnprepared(statement string, language string) bool {
+func (c *protoClient) handleExecuteUnprepared(statement string, language string) bool {
         request := protos.ExecuteUnparameterizedStatementRequest{
                 LanguageName: language,
                 Statement: statement,
@@ -135,7 +139,7 @@ func convertValues(raw protos.ProtoValue) interface{} {
         return nil
 }
 
-func (c *ProtoClient) FetchResult() [][]interface{} {
+func (c *protoClient) handleFetchResult() [][]interface{} {
 	// the first is nil
 	result, err := c.responseStreamUnprepared.Recv()
         if err != nil {
@@ -163,7 +167,7 @@ func (c *ProtoClient) FetchResult() [][]interface{} {
                         return values
                 } else if len(frame.GetDocumentFrame().GetDocuments()) != 0{
 			documents := frame.GetDocumentFrame().GetDocuments()
-			var kv PolyphenyKeyValuePair
+			var kv polyphenyKeyValuePair
 			var currentDocument []interface{}
 			for _, entries := range documents {
 				currentDocument = []interface{}{}
@@ -176,7 +180,7 @@ func (c *ProtoClient) FetchResult() [][]interface{} {
 			}
 			return values
                 } else {
-                        return nil//frame.GetGraphFrame()
+                        return nil
                 }
         } else {
                 return nil
