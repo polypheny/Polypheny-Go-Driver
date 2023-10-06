@@ -5,7 +5,7 @@ import (
 )
 
 func TestConnect(t *testing.T) {
-	client := connect("localhost:20590")
+	client := handleConnectRequest("localhost:20590")
 	if client.isConnected != true {
 		t.Fatal("Protoclient.isConnected is not set to true, but no error was caught")
 	}

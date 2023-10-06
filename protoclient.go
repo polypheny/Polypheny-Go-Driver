@@ -16,7 +16,7 @@ const (
         minorApiVersion = 0
 )
 
-func getServerProtoAPIVersion() [2]int {
+func getProtoAPIVersion() [2]int {
 	return [2]int{majorApiVersion, minorApiVersion}
 }
 
@@ -31,7 +31,7 @@ type protoClient struct {
         responseStreamUnprepared protos.ProtoInterface_ExecuteUnparameterizedStatementClient
 }
 
-type polyphenyKeyValuePair struct {
+type documentKeyValuePair struct {
 	key interface{}
 	value interface{}
 }
@@ -58,7 +58,7 @@ func newProtoClient(address string) *protoClient {
 	return &client
 }
 
-func connect(address string) *protoClient {
+func handleConnectRequest(address string) *protoClient {
 	client := newProtoClient(address)
         request := protos.ConnectionRequest{
                 MajorApiVersion: majorApiVersion,
@@ -76,7 +76,7 @@ func connect(address string) *protoClient {
         return client
 }
 
-func (c *protoClient) close() {
+func (c *protoClient) handleDisconnectRequest() {
         request := protos.DisconnectRequest{}
         _, err := c.client.Disconnect(c.ctx, &request)
         if err != nil {
@@ -139,7 +139,7 @@ func convertValues(raw protos.ProtoValue) interface{} {
         return nil
 }
 
-func (c *protoClient) handleFetchResult() [][]interface{} {
+func (c *protoClient) handleFetchiStreamResult() [][]interface{} {
 	// the first is nil
 	result, err := c.responseStreamUnprepared.Recv()
         if err != nil {
@@ -167,7 +167,7 @@ func (c *protoClient) handleFetchResult() [][]interface{} {
                         return values
                 } else if len(frame.GetDocumentFrame().GetDocuments()) != 0{
 			documents := frame.GetDocumentFrame().GetDocuments()
-			var kv polyphenyKeyValuePair
+			var kv documentKeyValuePair
 			var currentDocument []interface{}
 			for _, entries := range documents {
 				currentDocument = []interface{}{}

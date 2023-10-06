@@ -7,7 +7,7 @@ type Connection struct {
 }
 
 func Connect(address string) *Connection {
-	client := connect(address)
+	client := handleConnectRequest(address)
 	conn := Connection {
 		address: address,
 		isOpen: true,
@@ -21,7 +21,7 @@ func (conn *Connection) Execute(statement string, language string) {
 }
 
 func (conn *Connection) Fetch() [][]interface{} {
-	return conn.client.handleFetchResult()
+	return conn.client.handleFetchiStreamResult()
 }
 
 func (conn *Connection) Commit() {
@@ -29,5 +29,5 @@ func (conn *Connection) Commit() {
 }
 
 func (conn *Connection) Close() {
-	conn.client.close()
+	conn.client.handleDisconnectRequest()
 }
