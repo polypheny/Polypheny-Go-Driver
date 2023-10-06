@@ -5,14 +5,14 @@ import (
 	protos "polypheny.com/protos"
 )
 
-func TestConnect(t *testing.T) {
+func TestProtoConnect(t *testing.T) {
 	client := handleConnectRequest("localhost:20590")
 	if client.isConnected != true {
 		t.Fatal("Protoclient.isConnected is not set to true, but no error was caught")
 	}
 }
 
-func TestDuplicateConnection(t *testing.T) {
+func TestProtoDuplicateConnection(t *testing.T) {
 	client := handleConnectRequest("localhost:20590")
 		request := protos.ConnectionRequest{
                 MajorApiVersion: majorApiVersion,
