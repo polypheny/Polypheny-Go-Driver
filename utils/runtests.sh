@@ -14,7 +14,7 @@ mkdir ./build
 
 cp -r ./protos ./utils/generate.go ./build/
 
-cd build && go mod init utils && go mod tidy && go run . && rm -rf protos go.mod generate.go  && cd ..
+cd build && go run generate.go && rm -rf protos generate.go && cd ..
 
 cp *.go ./build
 
