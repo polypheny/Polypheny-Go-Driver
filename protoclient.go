@@ -106,7 +106,7 @@ func (c *protoClient) handleUpdateConnectionProperties(properties ...interface{}
 	}
 	_, err := c.client.UpdateConnectionProperties(c.ctx, &request)
 	if err != nil {
-                log.Fatalf("could not disconnect: %v", err)
+                log.Fatalf("could not update: %v", err)
         }
 }
 
@@ -119,6 +119,14 @@ func (c *protoClient) handleDisconnectRequest() {
         c.cancel()
         c.connection.Close()
         c.isConnected = false
+}
+
+func (c *protoClient) handleConnectionCheckRequest() {
+	request := protos.ConnectionCheckRequest{}
+	_, err := c.client.CheckConnection(c.ctx, &request)
+        if err != nil {
+                log.Fatalf("Checking connection failed: %v", err)
+        }
 }
 
 func (c *protoClient) handleCommitRequest() {

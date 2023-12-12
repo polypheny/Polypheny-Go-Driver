@@ -24,6 +24,14 @@ func TestUpdateConnection(t *testing.T) {
 	client.handleUpdateConnectionProperties(true)
 }
 
+func TestCheckConnection(t *testing.T) {
+        client := handleConnectRequest("localhost:20590", "pa", "", true)
+        if client.isConnected != true {
+                t.Fatal("Protoclient.isConnected is not set to true, but no error was caught")
+        }
+        client.handleConnectionCheckRequest()
+}
+
 func TestProtoDuplicateConnection(t *testing.T) {
 	username := "pa"
 	password := ""
