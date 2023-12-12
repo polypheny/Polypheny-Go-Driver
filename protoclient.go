@@ -99,6 +99,17 @@ func handleConnectRequest(address string, username string, password string,  pro
         return client
 }
 
+func (c *protoClient) handleUpdateConnectionProperties(properties ...interface{}) {
+	connectionProperties := createConnectionProperties(properties)
+	request := protos.ConnectionPropertiesUpdateRequest{
+		ConnectionProperties: &connectionProperties,
+	}
+	_, err := c.client.UpdateConnectionProperties(c.ctx, &request)
+	if err != nil {
+                log.Fatalf("could not disconnect: %v", err)
+        }
+}
+
 func (c *protoClient) handleDisconnectRequest() {
         request := protos.DisconnectRequest{}
         _, err := c.client.Disconnect(c.ctx, &request)
