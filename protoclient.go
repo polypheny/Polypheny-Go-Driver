@@ -20,9 +20,11 @@ func getProtoAPIVersion() [2]int {
 	return [2]int{majorApiVersion, minorApiVersion}
 }
 
+// Better to not store the password of a connection
 type protoClient struct {
         address string
         clientUUID string
+	username string
         connection *grpc.ClientConn
         client protos.ProtoInterfaceClient
         ctx context.Context
@@ -36,7 +38,7 @@ type documentKeyValuePair struct {
 	value interface{}
 }
 
-func newProtoClient(address string) *protoClient {
+func newProtoClient(address string, username string) *protoClient {
 	clientUUID := uuid.New().String()
         conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
         if err != nil {
@@ -48,6 +50,7 @@ func newProtoClient(address string) *protoClient {
         client := protoClient{
                 address: address,
                 clientUUID: clientUUID,
+		username: username,
                 connection: conn,
                 client: c,
                 ctx: ctx,
@@ -58,12 +61,14 @@ func newProtoClient(address string) *protoClient {
 	return &client
 }
 
-func handleConnectRequest(address string) *protoClient {
-	client := newProtoClient(address)
+func handleConnectRequest(address string, username string, password string) *protoClient {
+	client := newProtoClient(address, username)
         request := protos.ConnectionRequest{
                 MajorApiVersion: majorApiVersion,
                 MinorApiVersion: minorApiVersion,
                 ClientUuid: client.clientUUID,
+		Username: &username,
+		Password: &password,
         }
 	response, err := client.client.Connect(client.ctx, &request)
         if err != nil {

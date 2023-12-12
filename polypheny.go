@@ -6,8 +6,8 @@ type Connection struct {
 	client *protoClient
 }
 
-func Connect(address string) *Connection {
-	client := handleConnectRequest(address)
+func Connect(address string, username string, password string) *Connection {
+	client := handleConnectRequest(address, username, password)
 	conn := Connection {
 		address: address,
 		isOpen: true,

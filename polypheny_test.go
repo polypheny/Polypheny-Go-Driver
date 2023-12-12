@@ -5,7 +5,7 @@ import (
 )
 
 func TestFlow(t *testing.T) {
-	conn := Connect("localhost:20590")
+	conn := Connect("localhost:20590", "pa", "")
 	conn.Execute("SELECT * FROM emps", "sql")
 	result := conn.Fetch()
 	t.Log(result)
