@@ -61,14 +61,27 @@ func newProtoClient(address string, username string) *protoClient {
 	return &client
 }
 
-func handleConnectRequest(address string, username string, password string) *protoClient {
+func handleConnectRequest(address string, username string, password string,  properties ...interface{}) *protoClient {
 	client := newProtoClient(address, username)
+	connectionProperties := protos.ConnectionProperties{}
+	// TODO: switch to a different way to handle ConnectionProperties
+	for _, arg := range properties {
+		switch arg.(type) {
+		case string:
+			namespace_name := arg.(string)
+			connectionProperties.NamespaceName = &namespace_name
+		case bool:
+			is_auto_commit := arg.(bool)
+			connectionProperties.IsAutoCommit = &is_auto_commit
+		}
+	}
         request := protos.ConnectionRequest{
                 MajorApiVersion: majorApiVersion,
                 MinorApiVersion: minorApiVersion,
                 ClientUuid: client.clientUUID,
 		Username: &username,
 		Password: &password,
+		ConnectionProperties: &connectionProperties,
         }
 	response, err := client.client.Connect(client.ctx, &request)
         if err != nil {

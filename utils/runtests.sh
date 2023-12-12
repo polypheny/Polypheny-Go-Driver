@@ -26,4 +26,4 @@ go mod init github.com/polypheny/Polypheny-Go-Driver && go mod edit -replace pol
 
 cd ..
 
-rm -rf ./build
+#rm -rf ./build
