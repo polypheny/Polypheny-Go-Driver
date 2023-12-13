@@ -137,6 +137,14 @@ func (c *protoClient) handleCommitRequest() {
         }
 }
 
+func (c *protoClient) handleRollbackRequest() {
+	request := protos.RollbackRequest{}
+	_, err := c.client.RollbackTransaction(c.ctx, &request)
+	if err != nil {
+                log.Fatalf("could not rollback: %v", err)
+        }
+}
+
 func (c *protoClient) handleExecuteUnprepared(statement string, language string) bool {
         request := protos.ExecuteUnparameterizedStatementRequest{
                 LanguageName: language,
