@@ -83,3 +83,15 @@ func TestProtoDisconnect(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestGetDBMSVersion(t *testing.T) {
+	client := handleConnectRequest("localhost:20590", "pa", "")
+	dbms, version, major, minor := client.handleGetDBMSVersion()
+	t.Log(dbms, version, major, minor)
+}
+
+func TestGetSupportedLanguage(t *testing.T) {
+        client := handleConnectRequest("localhost:20590", "pa", "")
+        langs := client.handleGetSupportedLanguage()
+        t.Log(langs)
+}

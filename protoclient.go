@@ -228,3 +228,22 @@ func (c *protoClient) handleFetchiStreamResult() [][]interface{} {
                 return nil
         }
 }
+
+// Meta requests
+func (c *protoClient) handleGetDBMSVersion() (string, string, int32, int32) {
+	request := protos.DbmsVersionRequest{}
+	resp, err := c.client.GetDbmsVersion(c.ctx, &request)
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
+	return resp.GetDbmsName(), resp.GetVersionName(), resp.GetMajorVersion(), resp.GetMinorVersion()
+}
+
+func (c *protoClient) handleGetSupportedLanguage() []string {
+	request := protos.LanguageRequest{}
+	resp, err := c.client.GetSupportedLanguages(c.ctx, &request)
+	if err != nil {
+                log.Fatalf("%v", err)
+        }
+	return resp.GetLanguageNames()
+}
