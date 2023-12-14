@@ -84,6 +84,12 @@ func TestProtoDisconnect(t *testing.T) {
 	}
 }
 
+func TestGetClientInfoProperties(t *testing.T) {
+	client := handleConnectRequest("localhost:20590", "pa", "")
+        result := client.handleGetClientInfoProperties()
+        t.Log(result)
+}
+
 func TestGetDBMSVersion(t *testing.T) {
 	client := handleConnectRequest("localhost:20590", "pa", "")
 	dbms, version, major, minor := client.handleGetDBMSVersion()

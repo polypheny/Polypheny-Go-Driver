@@ -121,6 +121,25 @@ func (c *protoClient) handleDisconnectRequest() {
         c.isConnected = false
 }
 
+func (c *protoClient) handleGetClientInfoProperties() map[string]string {
+	request := protos.ClientInfoPropertiesRequest{}
+	resp, err := c.client.GetClientInfoProperties(c.ctx, &request)
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
+	return resp.GetProperties()
+}
+
+func (c *protoClient) handleSetClientInfoProperties(properties map[string] string) {
+	request := protos.ClientInfoProperties{
+		Properties: properties,
+	}
+	_, err := c.client.SetClientInfoProperties(c.ctx, &request)
+	if err != nil {
+                log.Fatalf("%v", err)
+        }
+}
+
 func (c *protoClient) handleConnectionCheckRequest() {
 	request := protos.ConnectionCheckRequest{}
 	_, err := c.client.CheckConnection(c.ctx, &request)
