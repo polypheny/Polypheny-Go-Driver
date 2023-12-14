@@ -189,3 +189,10 @@ func TestGetSqlKeywords(t *testing.T) {
         result := client.handleGetSqlKeywords()
         t.Log(result)
 }
+
+func TestMakeProtoValue(t *testing.T) {
+	t.Log(makeProtoValue(int32(1)))
+	t.Log(makeProtoValue(1.1))
+	t.Log(makeProtoValue(true))
+	t.Log(makeProtoValue("Hello, world"))
+}

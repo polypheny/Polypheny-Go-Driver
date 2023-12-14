@@ -227,6 +227,82 @@ func convertValues(raw protos.ProtoValue) interface{} {
         return nil
 }
 
+/* very experimental function to generate a ProtoValue from a given Go native value
+func (c *protoClient) makeProtoValue(value interface{}) protos.ProtoValue {
+	var protoType protos.ProtoValue_ProtoValueType
+	var result protos.ProtoValue
+	switch value.(type) {
+	case int32:
+		protoType = 1
+		result = protos.ProtoValue{
+			Type: protoType,
+			Value: &protos.ProtoValue_Integer{
+				Integer: &protos.ProtoInteger{Integer: value.(int32)},
+			},
+		}
+	}
+	return result
+}*/
+
+// Generate a ProtoValue from a given Go native value
+func makeProtoValue(value interface{}) protos.ProtoValue {
+	var protoType protos.ProtoValue_ProtoValueType
+        var result protos.ProtoValue
+        switch value.(type) {
+	case bool:
+		protoType = 1
+		result = protos.ProtoValue{
+                        Type: protoType,
+                        Value: &protos.ProtoValue_Boolean{
+                                Boolean: &protos.ProtoBoolean{Boolean: value.(bool)},
+                        },
+                }
+	case int32:
+		protoType = 4
+		result = protos.ProtoValue{
+                        Type: protoType,
+                        Value: &protos.ProtoValue_Integer{
+                                Integer: &protos.ProtoInteger{Integer: value.(int32)},
+                        },
+                }
+	case int64:
+		protoType = 5
+		result = protos.ProtoValue{
+                        Type: protoType,
+                        Value: &protos.ProtoValue_Long{
+                                Long: &protos.ProtoLong{Long: value.(int64)},
+                        },
+                }
+	case float64:
+		protoType = 9
+		result = protos.ProtoValue{
+                        Type: protoType,
+                        Value: &protos.ProtoValue_Double{
+                                Double: &protos.ProtoDouble{Double: value.(float64)},
+                        },
+                }
+	case float32:
+		protoType = 8
+		result = protos.ProtoValue{
+                        Type: protoType,
+                        Value: &protos.ProtoValue_Float{
+                                Float: &protos.ProtoFloat{Float: value.(float32)},
+                        },
+                }
+	case string:
+		protoType = 29
+		result = protos.ProtoValue{
+                        Type: protoType,
+                        Value: &protos.ProtoValue_String_{
+                                String_: &protos.ProtoString{String_: value.(string)},
+                        },
+                }
+	default:
+		log.Fatalf("This is likely a bug: %T %v", value, value)
+	}
+	return result
+}
+
 func (c *protoClient) handleFetchiStreamResult() [][]interface{} {
 	// the first is nil
 	result, err := c.responseStreamUnprepared.Recv()
