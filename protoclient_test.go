@@ -117,3 +117,9 @@ func TestGetTypes(t *testing.T) {
 	}
         t.Log(names)
 }
+
+func TestGetUserDefinedTypes(t *testing.T) {
+        client := handleConnectRequest("localhost:20590", "pa", "")
+        result := client.handleGetUserDefinedTypes()
+        t.Log(result)
+}

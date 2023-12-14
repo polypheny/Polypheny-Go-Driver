@@ -301,3 +301,31 @@ func (c *protoClient) handleGetTypes() []*protos.Type {
         }
 	return resp.GetTypes()
 }
+
+type ProtoUserDefinedType struct {
+	valueName string
+	metaValue []string
+}
+
+func (c *protoClient) handleGetUserDefinedTypes() []ProtoUserDefinedType {
+	// not implemented in polypheny
+	// the commented code is for future use
+	return nil
+	/*request := protos.UserDefinedTypesRequest{}
+	resp, err := c.client.GetUserDefinedTypes(c.ctx, &request)
+	if err != nil {
+                log.Fatalf("%v", err)
+        }
+	var result []ProtoUserDefinedType
+	for _, v := range resp.GetUserDefinedTypes() {
+		item := ProtoUserDefinedType{
+			valueName: v.GetTypeName(),
+			metaValue: []string{},
+		}
+		for _, valueMetas := range v.GetValueMetas() {
+			item.metaValue = append(item.metaValue, valueMetas.GetValueName())
+		}
+		result = append(result, item)
+	}
+	return result*/
+}
