@@ -255,3 +255,49 @@ func (c *protoClient) handleGetSupportedLanguage() []string {
         }
 	return resp.GetLanguageNames()
 }
+
+type ProtoDatabase struct {
+	databaseName string
+	ownerName string
+	defaultNamespaceName string
+}
+
+func (c *protoClient) handleGetDatabases() []ProtoDatabase {
+	request := protos.DatabasesRequest{}
+	resp, err := c.client.GetDatabases(c.ctx, &request)
+	if err != nil {
+                log.Fatalf("%v", err)
+        }
+	var result []ProtoDatabase
+	for _, v  := range resp.GetDatabases() {
+		item := ProtoDatabase{
+			databaseName: v.GetDatabaseName(),
+			ownerName: v.GetOwnerName(),
+			defaultNamespaceName: v.GetDefaultNamespaceName(),
+		}
+		result = append(result, item)
+	}
+	return result
+}
+
+func (c *protoClient) handleGetTableTypes() []string {
+	request := protos.TableTypesRequest{}
+	resp, err := c.client.GetTableTypes(c.ctx, &request)
+	if err != nil {
+                log.Fatalf("%v", err)
+        }
+	var result []string
+	for _, v := range resp.GetTableTypes() {
+		result = append(result, v.GetTableType())
+	}
+	return result
+}
+
+func (c *protoClient) handleGetTypes() []*protos.Type {
+	request := protos.TypesRequest{}
+	resp, err := c.client.GetTypes(c.ctx, &request)
+	if err != nil {
+                log.Fatalf("%v", err)
+        }
+	return resp.GetTypes()
+}

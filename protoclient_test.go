@@ -95,3 +95,25 @@ func TestGetSupportedLanguage(t *testing.T) {
         langs := client.handleGetSupportedLanguage()
         t.Log(langs)
 }
+
+func TestGetDatabases(t *testing.T) {
+	client := handleConnectRequest("localhost:20590", "pa", "")
+        result := client.handleGetDatabases()
+        t.Log(result)
+}
+
+func TestGetTableTypes(t *testing.T) {
+        client := handleConnectRequest("localhost:20590", "pa", "")
+        result := client.handleGetTableTypes()
+        t.Log(result)
+}
+
+func TestGetTypes(t *testing.T) {
+        client := handleConnectRequest("localhost:20590", "pa", "")
+        result := client.handleGetTypes()
+	var names []string
+	for _, v := range result {
+		names = append(names, v.GetTypeName())
+	}
+        t.Log(names)
+}
