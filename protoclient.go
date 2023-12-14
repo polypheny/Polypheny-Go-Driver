@@ -228,7 +228,7 @@ func convertValues(raw protos.ProtoValue) interface{} {
 }
 
 // Generate a ProtoValue from a given Go native value
-func makeProtoValue(value interface{}) protos.ProtoValue {
+func makeProtoValue(value interface{}) *protos.ProtoValue {
 	var protoType protos.ProtoValue_ProtoValueType
         var result protos.ProtoValue
         switch value.(type) {
@@ -283,7 +283,28 @@ func makeProtoValue(value interface{}) protos.ProtoValue {
 	default:
 		log.Fatalf("This is likely a bug: %T %v", value, value)
 	}
-	return result
+	return &result
+}
+
+// Maybe later change all the fetch size arg as some global configurations, together with other items
+func (c *protoClient) handleExecuteIndexedStatement(statementID int32, fetchSize int32, args ...interface{}) *protos.StatementResult {
+	var parameters []*protos.ProtoValue
+	for _, v := range args {
+		parameters = append(parameters, makeProtoValue(v))
+	}
+	indexParameters := protos.IndexedParameters{
+		Parameters: parameters,
+	}
+	request := protos.ExecuteIndexedStatementRequest{
+		StatementId: statementID,
+		Parameters: &indexParameters,
+		FetchSize: &fetchSize,
+	}
+	resp, err := c.client.ExecuteIndexedStatement(c.ctx, &request)
+	if err != nil {
+                log.Fatalf("%v", err)
+        }
+	return resp
 }
 
 func (c *protoClient) handleFetchiStreamResult() [][]interface{} {

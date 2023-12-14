@@ -196,15 +196,11 @@ func TestMakeProtoValue(t *testing.T) {
 	t.Log(makeProtoValue(true))
 	t.Log(makeProtoValue("Hello, world"))
 	pv := makeProtoValue(int32(1))
-	pointer := &pv
-	t.Log(pointer.GetInteger().GetInteger())
+	t.Log(pv.GetInteger().GetInteger())
 	pv = makeProtoValue(1.1)
-        pointer = &pv
-        t.Log(pointer.GetFloat().GetFloat())
+        t.Log(pv.GetFloat().GetFloat())
 	pv = makeProtoValue(true)
-        pointer = &pv
-        t.Log(pointer.GetBoolean().GetBoolean())
+        t.Log(pv.GetBoolean().GetBoolean())
 	pv = makeProtoValue("Hello, world")
-        pointer = &pv
-        t.Log(pointer.GetString_().GetString_())
+        t.Log(pv.GetString_().GetString_())
 }
