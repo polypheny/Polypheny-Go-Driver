@@ -227,23 +227,6 @@ func convertValues(raw protos.ProtoValue) interface{} {
         return nil
 }
 
-/* very experimental function to generate a ProtoValue from a given Go native value
-func (c *protoClient) makeProtoValue(value interface{}) protos.ProtoValue {
-	var protoType protos.ProtoValue_ProtoValueType
-	var result protos.ProtoValue
-	switch value.(type) {
-	case int32:
-		protoType = 1
-		result = protos.ProtoValue{
-			Type: protoType,
-			Value: &protos.ProtoValue_Integer{
-				Integer: &protos.ProtoInteger{Integer: value.(int32)},
-			},
-		}
-	}
-	return result
-}*/
-
 // Generate a ProtoValue from a given Go native value
 func makeProtoValue(value interface{}) protos.ProtoValue {
 	var protoType protos.ProtoValue_ProtoValueType
