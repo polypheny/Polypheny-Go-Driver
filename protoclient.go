@@ -329,3 +329,139 @@ func (c *protoClient) handleGetUserDefinedTypes() []ProtoUserDefinedType {
 	}
 	return result*/
 }
+
+func (c *protoClient) handleGetClientInfoPropertyMetas() []*protos.ClientInfoPropertyMeta {
+	// not implemented in polypheny
+        // the commented code is for future use
+        return nil
+	/*request := protos.ClientInfoPropertyMetaRequest{}
+	resp, err := c.client.GetClientInfoPropertyMetas(c.ctx, &request)
+        if err != nil {
+                log.Fatalf("%v", err)
+        }
+        return resp.GetClientInfoPropertyMetas()*/
+}
+
+func (c *protoClient) handleSearchProcedures(language string, pattern ...string) []*protos.Procedure {
+	var procedureNamePattern string
+	if len(pattern) == 0 {
+		procedureNamePattern = ""
+	} else {
+		procedureNamePattern = pattern[0]
+	}
+	request := protos.ProceduresRequest{
+		Language: language,
+		ProcedureNamePattern: &procedureNamePattern,
+	}
+	resp, err := c.client.SearchProcedures(c.ctx, &request)
+	if err != nil {
+                log.Fatalf("%v", err)
+        }
+        return resp.GetProcedures()
+}
+
+func (c *protoClient) handleSearchFunctions(language string, functionCategory string) []*protos.Function {
+	request := protos.FunctionsRequest{
+                QueryLanguage: language,
+                FunctionCategory: functionCategory,
+        }
+        resp, err := c.client.SearchFunctions(c.ctx, &request)
+        if err != nil {
+                log.Fatalf("%v", err)
+        }
+        return resp.GetFunctions()
+}
+
+func (c *protoClient) handleSearchNamespaces(pattern string, types ...string) []*protos.Namespace {
+	// polypheny will throw an exception when doing the rpc
+	return nil
+	/*var namespaceType string
+	if len(types) == 0 {
+                namespaceType = ""
+        } else {
+                namespaceType = types[0]
+        }
+	request := protos.NamespacesRequest {
+		NamespacePattern: &pattern,
+		NamespaceType: &namespaceType,
+	}
+	resp, err := c.client.SearchNamespaces(c.ctx, &request)
+        if err != nil {
+                log.Fatalf("%v", err)
+        }
+        return resp.GetNamespaces()*/
+}
+
+func (c *protoClient) handleGetNamespace(namespace string) *protos.Namespace {
+	request := protos.NamespaceRequest{
+		NamespaceName: namespace,
+	}
+	resp, err := c.client.GetNamespace(c.ctx, &request)
+        if err != nil {
+                log.Fatalf("%v", err)
+        }
+        return resp
+}
+
+func (c *protoClient) handleSearchEntities(namespaceName string, pattern ...string) []*protos.Entity {
+	var entityPattern  string
+        if len(pattern) == 0 {
+                entityPattern = ""
+        } else {
+                entityPattern = pattern[0]
+        }
+        request := protos.EntitiesRequest{
+                NamespaceName: namespaceName,
+                EntityPattern: &entityPattern,
+        }
+        resp, err := c.client.SearchEntities(c.ctx, &request)
+        if err != nil {
+                log.Fatalf("%v", err)
+        }
+        return resp.GetEntities()
+}
+
+func (c *protoClient) handleGetSqlStringFunctions() string {
+	request := protos.SqlStringFunctionsRequest{}
+	resp, err := c.client.GetSqlStringFunctions(c.ctx, &request)
+        if err != nil {
+                log.Fatalf("%v", err)
+        }
+        return resp.GetString_()
+}
+
+func (c *protoClient) handleGetSqlSystemFunctions() string {
+        request := protos.SqlSystemFunctionsRequest{}
+        resp, err := c.client.GetSqlSystemFunctions(c.ctx, &request)
+        if err != nil {
+                log.Fatalf("%v", err)
+        }
+        return resp.GetString_()
+}
+
+func (c *protoClient) handleGetSqlTimeDateFunctions() string {
+        request := protos.SqlTimeDateFunctionsRequest{}
+        resp, err := c.client.GetSqlTimeDateFunctions(c.ctx, &request)
+        if err != nil {
+                log.Fatalf("%v", err)
+        }
+        return resp.GetString_()
+}
+
+func (c *protoClient) handleGetSqlNumericFunctions() string {
+        request := protos.SqlNumericFunctionsRequest{}
+        resp, err := c.client.GetSqlNumericFunctions(c.ctx, &request)
+        if err != nil {
+                log.Fatalf("%v", err)
+        }
+        return resp.GetString_()
+}
+
+func (c *protoClient) handleGetSqlKeywords() string {
+        request := protos.SqlKeywordsRequest{}
+        resp, err := c.client.GetSqlKeywords(c.ctx, &request)
+        if err != nil {
+                log.Fatalf("%v", err)
+        }
+        return resp.GetString_()
+}

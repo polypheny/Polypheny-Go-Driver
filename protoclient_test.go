@@ -123,3 +123,63 @@ func TestGetUserDefinedTypes(t *testing.T) {
         result := client.handleGetUserDefinedTypes()
         t.Log(result)
 }
+
+func TestGetClientInfoPropertyMetas(t *testing.T) {
+        client := handleConnectRequest("localhost:20590", "pa", "")
+        result := client.handleGetClientInfoPropertyMetas()
+        t.Log(result)
+}
+
+func TestSearchProcedures(t *testing.T) {
+        client := handleConnectRequest("localhost:20590", "pa", "")
+        result := client.handleSearchProcedures("sql")
+	t.Log(result)
+}
+
+func TestSearchNamespaces(t *testing.T) {
+        client := handleConnectRequest("localhost:20590", "pa", "")
+        result := client.handleSearchNamespaces("")
+        t.Log(result)
+}
+
+func TestGetNamespace(t *testing.T) {
+        client := handleConnectRequest("localhost:20590", "pa", "")
+        result := client.handleGetNamespace("public")
+        t.Log(result)
+}
+
+func TestSearchEntities(t *testing.T) {
+        client := handleConnectRequest("localhost:20590", "pa", "")
+        result := client.handleSearchEntities("public")
+        t.Log(result)
+}
+
+func TestGetSqlStringFunctions(t *testing.T) {
+        client := handleConnectRequest("localhost:20590", "pa", "")
+        result := client.handleGetSqlStringFunctions()
+        t.Log(result)
+}
+
+func TestGetSqlSystemFunctions(t *testing.T) {
+        client := handleConnectRequest("localhost:20590", "pa", "")
+        result := client.handleGetSqlSystemFunctions()
+        t.Log(result)
+}
+
+func TestGetSqlTimeDateFunctions(t *testing.T) {
+        client := handleConnectRequest("localhost:20590", "pa", "")
+        result := client.handleGetSqlTimeDateFunctions()
+        t.Log(result)
+}
+
+func TestGetSqlNumericFunctions(t *testing.T) {
+        client := handleConnectRequest("localhost:20590", "pa", "")
+        result := client.handleGetSqlNumericFunctions()
+        t.Log(result)
+}
+
+func TestGetSqlKeywords(t *testing.T) {
+        client := handleConnectRequest("localhost:20590", "pa", "")
+        result := client.handleGetSqlKeywords()
+        t.Log(result)
+}
