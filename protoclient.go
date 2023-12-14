@@ -164,6 +164,25 @@ func (c *protoClient) handleRollbackRequest() {
         }
 }
 
+func (c *protoClient) handlePrepareIndexedStatement(languageName string, statement string, namespace ...string) *protos.PreparedStatementSignature {
+	var namespaceName string
+        if len(namespace) == 0 {
+                namespaceName = ""
+        } else {
+                namespaceName = namespace[0]
+        }
+        request := protos.PrepareStatementRequest{
+		LanguageName: languageName,
+		Statement: statement,
+                NamespaceName: &namespaceName,
+        }
+        resp, err := c.client.PrepareIndexedStatement(c.ctx, &request)
+        if err != nil {
+                log.Fatalf("%v", err)
+        }
+        return resp
+}
+
 func (c *protoClient) handleExecuteUnprepared(statement string, language string) bool {
         request := protos.ExecuteUnparameterizedStatementRequest{
                 LanguageName: language,
