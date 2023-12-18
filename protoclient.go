@@ -183,6 +183,25 @@ func (c *protoClient) handlePrepareIndexedStatement(languageName string, stateme
         return resp
 }
 
+func (c *protoClient) handlePrepareNamedStatement(languageName string, statement string, namespace ...string) *protos.PreparedStatementSignature {
+	var namespaceName string
+        if len(namespace) == 0 {
+                namespaceName = ""
+        } else {
+                namespaceName = namespace[0]
+        }
+        request := protos.PrepareStatementRequest{
+		LanguageName: languageName,
+		Statement: statement,
+                NamespaceName: &namespaceName,
+        }
+        resp, err := c.client.PrepareNamedStatement(c.ctx, &request)
+        if err != nil {
+                log.Fatalf("%v", err)
+        }
+        return resp
+}
+
 func (c *protoClient) handleExecuteUnprepared(statement string, language string) bool {
         request := protos.ExecuteUnparameterizedStatementRequest{
                 LanguageName: language,
@@ -301,6 +320,27 @@ func (c *protoClient) handleExecuteIndexedStatement(statementID int32, fetchSize
 		FetchSize: &fetchSize,
 	}
 	resp, err := c.client.ExecuteIndexedStatement(c.ctx, &request)
+	if err != nil {
+                log.Fatalf("%v", err)
+        }
+	return resp
+}
+
+func (c *protoClient) handleExecuteNamedStatement(statementID int32, fetchSize int32, args map[string]interface{}) *protos.StatementResult {
+	var parameters map[string]*protos.ProtoValue
+	parameters = make(map[string]*protos.ProtoValue)
+	for k, v := range args {
+		parameters[k] = makeProtoValue(v)
+	}
+	namedParameters := protos.NamedParameters{
+		Parameters: parameters,
+	}
+	request := protos.ExecuteNamedStatementRequest{
+		StatementId: statementID,
+		Parameters: &namedParameters,
+		FetchSize: &fetchSize,
+	}
+	resp, err := c.client.ExecuteNamedStatement(c.ctx, &request)
 	if err != nil {
                 log.Fatalf("%v", err)
         }
