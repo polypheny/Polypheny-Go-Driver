@@ -7,7 +7,7 @@
 </p> 
 
 
-# Polypheny-DB Go Driver
+# Polypheny-DB Go Driver WIP
 
 
 A Polypheny-DB Driver for the Go programming language.
