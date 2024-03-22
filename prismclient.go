@@ -146,7 +146,10 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(language stri
 	buf := c.recv()
 	var response prism.Response
 	proto.Unmarshal(buf, &response)
-	if response.GetStatementResponse() == nil {
+	requestID := response.GetStatementResponse().GetStatementId()
+	buf = c.recv() // this is the query result
+	proto.Unmarshal(buf, &response)
+	if requestID != response.GetStatementResponse().GetStatementId() {
 		return nil
 	}
 	if response.GetStatementResponse().GetResult() == nil {
@@ -188,4 +191,68 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(language stri
 		// graph is currently not supported
 		return nil
 	}
+
+}
+
+func (c *prismClient) handleFetchRequest(statementId int32) [][]interface{} {
+	request := prism.Request{
+		Type: &prism.Request_FetchRequest{
+			FetchRequest: &prism.FetchRequest{
+				StatementId: statementId,
+			},
+		},
+	}
+	c.send(c.serialize(&request))
+	buf := c.recv()
+	var response prism.Response
+	proto.Unmarshal(buf, &response)
+	if response.GetStatementResponse().GetResult() == nil {
+		return nil
+	}
+	if response.GetStatementResponse().GetResult().GetFrame() == nil {
+		return nil
+	}
+
+	frame := response.GetStatementResponse().GetResult().GetFrame()
+	var values [][]interface{}
+	if frame.GetRelationalFrame() != nil {
+		relationalData := frame.GetRelationalFrame()
+		rows := relationalData.GetRows()
+		var currentRow []interface{}
+		for _, irow := range rows {
+			currentRow = []interface{}{}
+			for _, ivalue := range irow.GetValues() {
+				currentRow = append(currentRow, convertProtoValue(ivalue))
+			}
+			values = append(values, currentRow)
+		}
+		return values
+	} else if frame.GetDocumentFrame() != nil {
+		documentData := frame.GetDocumentFrame().GetDocuments()
+		var kv documentKeyValuePair
+		var currentDocument []interface{}
+		for _, entries := range documentData {
+			currentDocument = []interface{}{}
+			for _, v := range entries.GetEntries() {
+				kv.key = convertProtoValue(v.GetKey())
+				kv.value = convertProtoValue(v.GetValue())
+				currentDocument = append(currentDocument, kv)
+			}
+			values = append(values, currentDocument)
+		}
+		return values
+	} else {
+		// graph is currently not supported
+		return nil
+	}
+}
+
+func (c *prismClient) handleCommitRequest() {
+	request := prism.Request{
+		Type: &prism.Request_CommitRequest{
+			CommitRequest: &prism.CommitRequest{},
+		},
+	}
+	c.send(c.serialize(&request))
+	c.recv()
 }
