@@ -20,6 +20,8 @@ const (
 	statusPolyphenyConnected = 2
 )
 
+// Let's see if this is enough, the currecnt idea is hold all the low-level rrequests and responses here
+// the fecthed results and other things should be returned to the caller ---- the polyclient.
 type prismClient struct {
 	address     string   // addr:port
 	username    string   // username is stored, but password is not
@@ -30,6 +32,20 @@ type prismClient struct {
 type documentKeyValuePair struct {
 	key   interface{}
 	value interface{}
+}
+
+// TODO: maybe re-org these source files by seperating all the types?
+type PolyphenyVersionResponse struct {
+	dbmsName     string
+	versionName  string
+	majorVersion int32
+	minorVersion int32
+}
+
+type DatabaseEntryResponse struct {
+	databaseName         string
+	ownerName            string
+	defaultNamespaceName string
 }
 
 func newConnection(address string, username string) *prismClient { // TODO: is there a better way to pass password?
@@ -76,6 +92,14 @@ func (c *prismClient) close() {
 		log.Fatal(err)
 	}
 	c.isConnected = statusDisconnected
+}
+
+func (c *prismClient) helperSendAndRecv(m proto.Message) *prism.Response {
+	c.send(c.serialize(m))
+	buf := c.recv()
+	var response prism.Response
+	proto.Unmarshal(buf, &response)
+	return &response
 }
 
 func handleConnectRequest(address string, username string, password string) *prismClient {
@@ -255,4 +279,62 @@ func (c *prismClient) handleCommitRequest() {
 	}
 	c.send(c.serialize(&request))
 	c.recv()
+}
+
+func (c *prismClient) handleDbmsVersionRequest() PolyphenyVersionResponse {
+	request := prism.Request{
+		Type: &prism.Request_DbmsVersionRequest{
+			DbmsVersionRequest: &prism.DbmsVersionRequest{},
+		},
+	}
+	response := c.helperSendAndRecv(&request)
+	result := PolyphenyVersionResponse{
+		dbmsName:     response.GetDbmsVersionResponse().GetDbmsName(),
+		versionName:  response.GetDbmsVersionResponse().GetVersionName(),
+		majorVersion: response.GetDbmsVersionResponse().GetMajorVersion(),
+		minorVersion: response.GetDbmsVersionResponse().GetMinorVersion(),
+	}
+	return result
+}
+
+func (c *prismClient) handleLanguageRequest() []string {
+	request := prism.Request{
+		Type: &prism.Request_LanguageRequest{
+			LanguageRequest: &prism.LanguageRequest{},
+		},
+	}
+	response := c.helperSendAndRecv(&request)
+	return response.GetLanguageResponse().GetLanguageNames()
+}
+
+func (c *prismClient) handleDatabaseRequest() []DatabaseEntryResponse {
+	request := prism.Request{
+		Type: &prism.Request_DatabasesRequest{
+			DatabasesRequest: &prism.DatabasesRequest{},
+		},
+	}
+	response := c.helperSendAndRecv(&request)
+	var result []DatabaseEntryResponse
+	for _, entry := range response.GetDatabasesResponse().GetDatabases() {
+		result = append(result, DatabaseEntryResponse{
+			databaseName:         entry.GetDatabaseName(),
+			ownerName:            entry.GetOwnerName(),
+			defaultNamespaceName: entry.GetDefaultNamespaceName(),
+		})
+	}
+	return result
+}
+
+func (c *prismClient) handleTableTypeRequest() []string {
+	request := prism.Request{
+		Type: &prism.Request_TableTypesRequest{
+			TableTypesRequest: &prism.TableTypesRequest{},
+		},
+	}
+	response := c.helperSendAndRecv(&request)
+	var result []string
+	for _, typeName := range response.GetTableTypesResponse().GetTableTypes() {
+		result = append(result, typeName.GetTableType())
+	}
+	return result
 }
