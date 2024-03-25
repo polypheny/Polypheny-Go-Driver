@@ -212,7 +212,7 @@ func (c *prismClient) handleDisconnectRequest() {
 	c.close()
 }
 
-func (c *prismClient) handleCloseResultRequest(statementId int32) {
+func (c *prismClient) handleCloseStatementRequest(statementId int32) {
 	request := prism.Request{
 		Type: &prism.Request_CloseStatementRequest{
 			CloseStatementRequest: &prism.CloseStatementRequest{
