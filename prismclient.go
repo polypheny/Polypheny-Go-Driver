@@ -48,6 +48,46 @@ type DatabaseEntryResponse struct {
 	defaultNamespaceName string
 }
 
+type TypeResponse struct {
+	typeName        string
+	precision       int32
+	literalPrefix   string
+	literalSuffix   string
+	isCaseSensitive bool
+	isSearchable    int32
+	isAutoIncrement bool
+	minScale        int32
+	maxScale        int32
+	radix           int32
+}
+
+type UserDefinedTypesResponse struct {
+	typeName   string
+	metaValues []string
+}
+
+type ProceduresResponse struct {
+	trivialName     string
+	inputParameters string
+	desc            string
+	returnType      int32
+	uniqleName      string
+}
+
+type ClientInfoPropertyMetaResponse struct {
+	key          string
+	defaultValue string
+	maxLength    int32
+	desc         string
+}
+
+type FunctionsResponse struct {
+	name             string
+	syntax           string
+	functionCategory string
+	isTableFunction  bool
+}
+
 func newConnection(address string, username string) *prismClient { // TODO: is there a better way to pass password?
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
@@ -335,6 +375,176 @@ func (c *prismClient) handleTableTypeRequest() []string {
 	var result []string
 	for _, typeName := range response.GetTableTypesResponse().GetTableTypes() {
 		result = append(result, typeName.GetTableType())
+	}
+	return result
+}
+
+func (c *prismClient) handleTypesRequest() []TypeResponse {
+	request := prism.Request{
+		Type: &prism.Request_TypesRequest{
+			TypesRequest: &prism.TypesRequest{},
+		},
+	}
+	response := c.helperSendAndRecv(&request)
+	var result []TypeResponse
+	for _, t := range response.GetTypesResponse().GetTypes() {
+		result = append(result, TypeResponse{
+			typeName:        t.GetTypeName(),
+			precision:       t.GetPrecision(),
+			literalPrefix:   t.GetLiteralPrefix(),
+			literalSuffix:   t.GetLiteralSuffix(),
+			isCaseSensitive: t.GetIsCaseSensitive(),
+			isSearchable:    t.GetIsSearchable(),
+			isAutoIncrement: t.GetIsAutoIncrement(),
+			minScale:        t.GetMinScale(),
+			maxScale:        t.GetMaxScale(),
+			radix:           t.GetRadix(),
+		})
+	}
+	return result
+}
+
+func (c *prismClient) handleUserDefinedTypesRequest() []UserDefinedTypesResponse {
+	request := prism.Request{
+		Type: &prism.Request_UserDefinedTypesRequest{
+			UserDefinedTypesRequest: &prism.UserDefinedTypesRequest{},
+		},
+	}
+	response := c.helperSendAndRecv(&request)
+	var result []UserDefinedTypesResponse
+	for _, t := range response.GetUserDefinedTypesResponse().GetUserDefinedTypes() {
+		var metaValues []string
+		for _, metaValue := range t.GetValueMetas() {
+			metaValues = append(metaValues, metaValue.GetValueName())
+		}
+		result = append(result, UserDefinedTypesResponse{
+			typeName:   t.GetTypeName(),
+			metaValues: metaValues,
+		})
+	}
+	return result
+}
+
+func (c *prismClient) handleSqlStringFunctionsRequest() string {
+	request := prism.Request{
+		Type: &prism.Request_SqlStringFunctionsRequest{
+			SqlStringFunctionsRequest: &prism.SqlStringFunctionsRequest{},
+		},
+	}
+	response := c.helperSendAndRecv(&request)
+	return response.GetSqlStringFunctionsResponse().GetString_()
+}
+
+func (c *prismClient) handleSqlSystemFunctionsRequest() string {
+	request := prism.Request{
+		Type: &prism.Request_SqlSystemFunctionsRequest{
+			SqlSystemFunctionsRequest: &prism.SqlSystemFunctionsRequest{},
+		},
+	}
+	response := c.helperSendAndRecv(&request)
+	return response.GetSqlSystemFunctionsResponse().GetString_()
+}
+
+func (c *prismClient) handleSqlTimeDateFunctionsRequest() string {
+	request := prism.Request{
+		Type: &prism.Request_SqlTimeDateFunctionsRequest{
+			SqlTimeDateFunctionsRequest: &prism.SqlTimeDateFunctionsRequest{},
+		},
+	}
+	response := c.helperSendAndRecv(&request)
+	return response.GetSqlTimeDateFunctionsResponse().GetString_()
+}
+
+func (c *prismClient) handleSqlNumericFunctionsRequest() string {
+	request := prism.Request{
+		Type: &prism.Request_SqlNumericFunctionsRequest{
+			SqlNumericFunctionsRequest: &prism.SqlNumericFunctionsRequest{},
+		},
+	}
+	response := c.helperSendAndRecv(&request)
+	return response.GetSqlNumericFunctionsResponse().GetString_()
+}
+
+func (c *prismClient) handleSqlKeywordsRequest() string {
+	request := prism.Request{
+		Type: &prism.Request_SqlKeywordsRequest{
+			SqlKeywordsRequest: &prism.SqlKeywordsRequest{},
+		},
+	}
+	response := c.helperSendAndRecv(&request)
+	return response.GetSqlKeywordsResponse().GetString_()
+}
+
+func (c *prismClient) handleProceduresRequest(language string, procedureNamePattern *string) []ProceduresResponse {
+	request := prism.Request{
+		Type: &prism.Request_ProceduresRequest{
+			ProceduresRequest: &prism.ProceduresRequest{
+				Language:             language,
+				ProcedureNamePattern: procedureNamePattern,
+			},
+		},
+	}
+	response := c.helperSendAndRecv(&request)
+	var result []ProceduresResponse
+	for _, procedure := range response.GetProceduresResponse().GetProcedures() {
+		result = append(result, ProceduresResponse{
+			trivialName:     procedure.GetTrivialName(),
+			inputParameters: procedure.GetInputParameters(),
+			desc:            procedure.GetDescription(),
+			returnType:      int32(procedure.GetReturnType()),
+			uniqleName:      procedure.GetUniqueName(),
+		})
+	}
+	return result
+}
+
+func (c *prismClient) handleClientInfoPropertiesRequest() map[string]string {
+	request := prism.Request{
+		Type: &prism.Request_ClientInfoPropertiesRequest{
+			ClientInfoPropertiesRequest: &prism.ClientInfoPropertiesRequest{},
+		},
+	}
+	response := c.helperSendAndRecv(&request)
+	return response.GetClientInfoPropertiesResponse().GetProperties()
+}
+
+func (c *prismClient) handleClientInfoPropertyMetaRequest() []ClientInfoPropertyMetaResponse {
+	request := prism.Request{
+		Type: &prism.Request_ClientInfoPropertyMetaRequest{
+			ClientInfoPropertyMetaRequest: &prism.ClientInfoPropertyMetaRequest{},
+		},
+	}
+	response := c.helperSendAndRecv(&request)
+	var result []ClientInfoPropertyMetaResponse
+	for _, entry := range response.GetClientInfoPropertyMetaResponse().GetClientInfoPropertyMetas() {
+		result = append(result, ClientInfoPropertyMetaResponse{
+			key:          entry.GetKey(),
+			defaultValue: entry.GetDefaultValue(),
+			maxLength:    entry.GetMaxlength(),
+			desc:         entry.GetDescription(),
+		})
+	}
+	return result
+}
+
+func (c *prismClient) handleFunctionsRequest(language string, category string) []FunctionsResponse {
+	request := prism.Request{
+		Type: &prism.Request_FunctionsRequest{
+			FunctionsRequest: &prism.FunctionsRequest{
+				QueryLanguage:    language,
+				FunctionCategory: category,
+			},
+		},
+	}
+	response := c.helperSendAndRecv(&request)
+	var result []FunctionsResponse
+	for _, f := range response.GetFunctionsResponse().GetFunctions() {
+		result = append(result, FunctionsResponse{
+			name:             f.GetName(),
+			syntax:           f.GetSyntax(),
+			functionCategory: f.GetFunctionCategory(),
+			isTableFunction:  f.GetIsTableFunction(),
+		})
 	}
 	return result
 }
