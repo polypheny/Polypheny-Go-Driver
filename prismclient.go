@@ -34,6 +34,13 @@ type documentKeyValuePair struct {
 	value interface{}
 }
 
+type UnparameterizedStatementRequest struct {
+	language      string
+	statement     string
+	fetchSize     *int32
+	namespaceName *string
+}
+
 // TODO: maybe re-org these source files by seperating all the types?
 type PolyphenyVersionResponse struct {
 	dbmsName     string
@@ -86,6 +93,12 @@ type FunctionsResponse struct {
 	syntax           string
 	functionCategory string
 	isTableFunction  bool
+}
+
+type NamespaceResponse struct {
+	namespaceName   string
+	isCaseSensitive bool
+	namespaceType   string
 }
 
 func newConnection(address string, username string) *prismClient { // TODO: is there a better way to pass password?
@@ -164,6 +177,29 @@ func handleConnectRequest(address string, username string, password string) *pri
 	return client
 }
 
+func (c *prismClient) handleConnectionPropertiesUpdateRequest(isAutoCommit *bool, namespaceName *string) {
+	request := prism.Request{
+		Type: &prism.Request_ConnectionPropertiesUpdateRequest{
+			ConnectionPropertiesUpdateRequest: &prism.ConnectionPropertiesUpdateRequest{
+				ConnectionProperties: &prism.ConnectionProperties{
+					IsAutoCommit:  isAutoCommit,
+					NamespaceName: namespaceName,
+				},
+			},
+		},
+	}
+	c.helperSendAndRecv(&request)
+}
+
+func (c *prismClient) handleConnectionCheckRequest() {
+	request := prism.Request{
+		Type: &prism.Request_ConnectionCheckRequest{
+			ConnectionCheckRequest: &prism.ConnectionCheckRequest{},
+		},
+	}
+	c.helperSendAndRecv(&request)
+}
+
 func (c *prismClient) handleDisconnectRequest() {
 	request := prism.Request{
 		Type: &prism.Request_DisconnectRequest{
@@ -174,6 +210,18 @@ func (c *prismClient) handleDisconnectRequest() {
 	c.recv()
 	c.isConnected = statusServerConnected
 	c.close()
+}
+
+func (c *prismClient) handleCloseResultRequest(statementId int32) {
+	request := prism.Request{
+		Type: &prism.Request_CloseStatementRequest{
+			CloseStatementRequest: &prism.CloseStatementRequest{
+				StatementId: statementId,
+			},
+		},
+	}
+	c.send(c.serialize(&request))
+	c.recv()
 }
 
 func convertProtoValue(raw *prism.ProtoValue) interface{} {
@@ -197,12 +245,14 @@ func convertProtoValue(raw *prism.ProtoValue) interface{} {
 	}
 }
 
-func (c *prismClient) handleExecuteUnparameterizedStatementRequest(language string, statement string) [][]interface{} {
+func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query UnparameterizedStatementRequest) [][]interface{} {
 	request := prism.Request{
 		Type: &prism.Request_ExecuteUnparameterizedStatementRequest{
 			ExecuteUnparameterizedStatementRequest: &prism.ExecuteUnparameterizedStatementRequest{
-				LanguageName: language,
-				Statement:    statement,
+				LanguageName:  query.language,
+				Statement:     query.statement,
+				FetchSize:     query.fetchSize,
+				NamespaceName: query.namespaceName,
 			},
 		},
 	}
@@ -256,6 +306,14 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(language stri
 		return nil
 	}
 
+}
+
+func (c *prismClient) handleExecuteUnparameterizedStatementBatchRequest(queries []UnparameterizedStatementRequest) [][][]interface{} {
+	var result [][][]interface{}
+	for _, query := range queries {
+		result = append(result, c.handleExecuteUnparameterizedStatementRequest(query))
+	}
+	return result
 }
 
 func (c *prismClient) handleFetchRequest(statementId int32) [][]interface{} {
@@ -315,6 +373,16 @@ func (c *prismClient) handleCommitRequest() {
 	request := prism.Request{
 		Type: &prism.Request_CommitRequest{
 			CommitRequest: &prism.CommitRequest{},
+		},
+	}
+	c.send(c.serialize(&request))
+	c.recv()
+}
+
+func (c *prismClient) handleRollbackRequest() {
+	request := prism.Request{
+		Type: &prism.Request_RollbackRequest{
+			RollbackRequest: &prism.RollbackRequest{},
 		},
 	}
 	c.send(c.serialize(&request))
@@ -547,4 +615,56 @@ func (c *prismClient) handleFunctionsRequest(language string, category string) [
 		})
 	}
 	return result
+}
+
+func (c *prismClient) handleNamespaceRequest(namespaceName string) NamespaceResponse {
+	request := prism.Request{
+		Type: &prism.Request_NamespaceRequest{
+			NamespaceRequest: &prism.NamespaceRequest{
+				NamespaceName: namespaceName,
+			},
+		},
+	}
+	c.send(c.serialize(&request))
+	buf := c.recv()
+	var response prism.Namespace
+	proto.Unmarshal(buf, &response)
+	return NamespaceResponse{
+		namespaceName:   response.GetNamespaceName(),
+		isCaseSensitive: response.GetIsCaseSensitive(),
+		namespaceType:   response.GetNamespaceType(),
+	}
+}
+
+func (c *prismClient) handleNamespacesResponse(namespacePattern *string, namespaceType *string) []NamespaceResponse {
+	request := prism.Request{
+		Type: &prism.Request_NamespacesRequest{
+			NamespacesRequest: &prism.NamespacesRequest{
+				NamespacePattern: namespacePattern,
+				NamespaceType:    namespaceType,
+			},
+		},
+	}
+	response := c.helperSendAndRecv(&request)
+	var result []NamespaceResponse
+	for _, entry := range response.GetNamespacesResponse().GetNamespaces() {
+		result = append(result, NamespaceResponse{
+			namespaceName:   entry.GetNamespaceName(),
+			isCaseSensitive: entry.GetIsCaseSensitive(),
+			namespaceType:   entry.GetNamespaceType(),
+		})
+	}
+	return result
+}
+
+func (c *prismClient) handleEntitiesRequest(namespaceName string, entityPattern *string) {
+	request := prism.Request{
+		Type: &prism.Request_EntitiesRequest{
+			EntitiesRequest: &prism.EntitiesRequest{
+				NamespaceName: namespaceName,
+				EntityPattern: entityPattern,
+			},
+		},
+	}
+	c.helperSendAndRecv(&request)
 }
