@@ -101,6 +101,14 @@ type NamespaceResponse struct {
 	namespaceType   string
 }
 
+type ParameterMetaResponse struct {
+	precision     int32
+	scale         int32
+	typeName      string
+	parameterName string
+	name          string
+}
+
 func newConnection(address string, username string) *prismClient { // TODO: is there a better way to pass password?
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
@@ -313,6 +321,58 @@ func (c *prismClient) handleExecuteUnparameterizedStatementBatchRequest(queries 
 	for _, query := range queries {
 		result = append(result, c.handleExecuteUnparameterizedStatementRequest(query))
 	}
+	return result
+}
+
+func (c *prismClient) handlePrepareIndexedStatementRequest(language string, statement string, namespace *string) map[int32][]ParameterMetaResponse {
+	request := prism.Request{
+		Type: &prism.Request_PrepareIndexedStatementRequest{
+			PrepareIndexedStatementRequest: &prism.PrepareStatementRequest{
+				LanguageName:  language,
+				Statement:     statement,
+				NamespaceName: namespace,
+			},
+		},
+	}
+	response := c.helperSendAndRecv(&request)
+	result := make(map[int32][]ParameterMetaResponse)
+	var parameterMetas []ParameterMetaResponse
+	for _, parameter := range response.GetPreparedStatementSignature().GetParameterMetas() {
+		parameterMetas = append(parameterMetas, ParameterMetaResponse{
+			precision:     parameter.GetPrecision(),
+			scale:         parameter.GetScale(),
+			typeName:      parameter.GetTypeName(),
+			parameterName: parameter.GetParameterName(),
+			name:          parameter.GetName(),
+		})
+	}
+	result[response.GetPreparedStatementSignature().GetStatementId()] = parameterMetas
+	return result
+}
+
+func (c *prismClient) handlePrepareNamedStatementRequest(language string, statement string, namespace *string) map[int32][]ParameterMetaResponse {
+	request := prism.Request{
+		Type: &prism.Request_PrepareNamedStatementRequest{
+			PrepareNamedStatementRequest: &prism.PrepareStatementRequest{
+				LanguageName:  language,
+				Statement:     statement,
+				NamespaceName: namespace,
+			},
+		},
+	}
+	response := c.helperSendAndRecv(&request)
+	result := make(map[int32][]ParameterMetaResponse)
+	var parameterMetas []ParameterMetaResponse
+	for _, parameter := range response.GetPreparedStatementSignature().GetParameterMetas() {
+		parameterMetas = append(parameterMetas, ParameterMetaResponse{
+			precision:     parameter.GetPrecision(),
+			scale:         parameter.GetScale(),
+			typeName:      parameter.GetTypeName(),
+			parameterName: parameter.GetParameterName(),
+			name:          parameter.GetName(),
+		})
+	}
+	result[response.GetPreparedStatementSignature().GetStatementId()] = parameterMetas
 	return result
 }
 
