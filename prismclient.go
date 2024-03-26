@@ -41,6 +41,10 @@ type UnparameterizedStatementRequest struct {
 	namespaceName *string
 }
 
+type IndexedParametersRequest struct {
+	parameters []interface{}
+}
+
 // TODO: maybe re-org these source files by seperating all the types?
 type PolyphenyVersionResponse struct {
 	dbmsName     string
@@ -253,6 +257,63 @@ func convertProtoValue(raw *prism.ProtoValue) interface{} {
 	}
 }
 
+func makeProtoValue(value interface{}) *prism.ProtoValue {
+	var result prism.ProtoValue
+	switch value.(type) {
+	case bool:
+		result = prism.ProtoValue{
+			Value: &prism.ProtoValue_Boolean{
+				Boolean: &prism.ProtoBoolean{
+					Boolean: value.(bool),
+				},
+			},
+		}
+	case int32:
+		result = prism.ProtoValue{
+			Value: &prism.ProtoValue_Integer{
+				Integer: &prism.ProtoInteger{
+					Integer: value.(int32),
+				},
+			},
+		}
+	case int64:
+		result = prism.ProtoValue{
+			Value: &prism.ProtoValue_Long{
+				Long: &prism.ProtoLong{
+					Long: value.(int64),
+				},
+			},
+		}
+	case float64:
+		result = prism.ProtoValue{
+			Value: &prism.ProtoValue_Double{
+				Double: &prism.ProtoDouble{
+					Double: value.(float64),
+				},
+			},
+		}
+	case float32:
+		result = prism.ProtoValue{
+			Value: &prism.ProtoValue_Float{
+				Float: &prism.ProtoFloat{
+					Float: value.(float32),
+				},
+			},
+		}
+	case string:
+		result = prism.ProtoValue{
+			Value: &prism.ProtoValue_String_{
+				String_: &prism.ProtoString{
+					String_: value.(string),
+				},
+			},
+		}
+	default:
+		log.Fatalf("Lack of support to %T %v", value, value)
+	}
+	return &result
+}
+
 func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query UnparameterizedStatementRequest) [][]interface{} {
 	request := prism.Request{
 		Type: &prism.Request_ExecuteUnparameterizedStatementRequest{
@@ -374,6 +435,132 @@ func (c *prismClient) handlePrepareNamedStatementRequest(language string, statem
 	}
 	result[response.GetPreparedStatementSignature().GetStatementId()] = parameterMetas
 	return result
+}
+
+func (c *prismClient) handleExecuteIndexedStatementRequest(statementId int32, parameters IndexedParametersRequest, fetchSize *int32) [][]interface{} {
+	polyvalues := make([]*prism.ProtoValue, len(parameters.parameters))
+	for i, v := range parameters.parameters {
+		polyvalues[i] = makeProtoValue(v)
+	}
+	request := prism.Request{
+		Type: &prism.Request_ExecuteIndexedStatementRequest{
+			ExecuteIndexedStatementRequest: &prism.ExecuteIndexedStatementRequest{
+				StatementId: statementId,
+				Parameters: &prism.IndexedParameters{
+					Parameters: polyvalues,
+				},
+				FetchSize: fetchSize,
+			},
+		},
+	}
+	response := c.helperSendAndRecv(&request)
+	if response.GetStatementResult() == nil {
+		return nil
+	}
+	if response.GetStatementResult().GetFrame() == nil {
+		return nil
+	}
+
+	frame := response.GetStatementResult().GetFrame()
+	var values [][]interface{}
+	// TODO: can we use a separate function to handle the following?
+	if frame.GetRelationalFrame() != nil {
+		relationalData := frame.GetRelationalFrame()
+		rows := relationalData.GetRows()
+		var currentRow []interface{}
+		for _, irow := range rows {
+			currentRow = []interface{}{}
+			for _, ivalue := range irow.GetValues() {
+				currentRow = append(currentRow, convertProtoValue(ivalue))
+			}
+			values = append(values, currentRow)
+		}
+		return values
+	} else if frame.GetDocumentFrame() != nil {
+		documentData := frame.GetDocumentFrame().GetDocuments()
+		var kv documentKeyValuePair
+		var currentDocument []interface{}
+		for _, entries := range documentData {
+			currentDocument = []interface{}{}
+			for _, v := range entries.GetEntries() {
+				kv.key = convertProtoValue(v.GetKey())
+				kv.value = convertProtoValue(v.GetValue())
+				currentDocument = append(currentDocument, kv)
+			}
+			values = append(values, currentDocument)
+		}
+		return values
+	} else {
+		// graph is currently not supported
+		return nil
+	}
+}
+
+func (c *prismClient) handleExecuteIndexedStatementBatchRequest(statementId int32, parameters []IndexedParametersRequest) [][][]interface{} {
+	var result [][][]interface{}
+	for _, parparameter := range parameters {
+		result = append(result, c.handleExecuteIndexedStatementRequest(statementId, parparameter, nil))
+	}
+	return result
+}
+
+func (c *prismClient) handleExecuteNamedStatementRequest(statementId int32, parameters map[string]interface{}, fetchSize *int32) [][]interface{} {
+	polyvalues := make(map[string]*prism.ProtoValue)
+	for k, v := range parameters {
+		polyvalues[k] = makeProtoValue(v)
+	}
+	request := prism.Request{
+		Type: &prism.Request_ExecuteNamedStatementRequest{
+			ExecuteNamedStatementRequest: &prism.ExecuteNamedStatementRequest{
+				StatementId: statementId,
+				Parameters: &prism.NamedParameters{
+					Parameters: polyvalues,
+				},
+				FetchSize: fetchSize,
+			},
+		},
+	}
+	response := c.helperSendAndRecv(&request)
+	if response.GetStatementResult() == nil {
+		return nil
+	}
+	if response.GetStatementResult().GetFrame() == nil {
+		return nil
+	}
+
+	frame := response.GetStatementResult().GetFrame()
+	var values [][]interface{}
+	// TODO: can we use a separate function to handle the following?
+	if frame.GetRelationalFrame() != nil {
+		relationalData := frame.GetRelationalFrame()
+		rows := relationalData.GetRows()
+		var currentRow []interface{}
+		for _, irow := range rows {
+			currentRow = []interface{}{}
+			for _, ivalue := range irow.GetValues() {
+				currentRow = append(currentRow, convertProtoValue(ivalue))
+			}
+			values = append(values, currentRow)
+		}
+		return values
+	} else if frame.GetDocumentFrame() != nil {
+		documentData := frame.GetDocumentFrame().GetDocuments()
+		var kv documentKeyValuePair
+		var currentDocument []interface{}
+		for _, entries := range documentData {
+			currentDocument = []interface{}{}
+			for _, v := range entries.GetEntries() {
+				kv.key = convertProtoValue(v.GetKey())
+				kv.value = convertProtoValue(v.GetValue())
+				currentDocument = append(currentDocument, kv)
+			}
+			values = append(values, currentDocument)
+		}
+		return values
+	} else {
+		// graph is currently not supported
+		return nil
+	}
 }
 
 func (c *prismClient) handleFetchRequest(statementId int32) [][]interface{} {
