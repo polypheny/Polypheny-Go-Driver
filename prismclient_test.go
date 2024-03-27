@@ -177,3 +177,91 @@ func TestConvertProtoValue(t *testing.T) {
 		t.Fatalf("Failed to convert, expected %v, but got %v", expected, result)
 	}
 }
+
+func TestHandleExecuteUnparameterizedStatementRequestSql(t *testing.T) {
+	address := "localhost:20590"
+	username := "pa"
+	password := ""
+	client := handleConnectRequest(address, username, password)
+	query := UnparameterizedStatementRequest{
+		language:      "sql",
+		statement:     "drop table if exists mytable",
+		fetchSize:     nil,
+		namespaceName: nil,
+	}
+	client.handleExecuteUnparameterizedStatementRequest(query)
+	query = UnparameterizedStatementRequest{
+		language:      "sql",
+		statement:     "create table mytable(id int not null, yac int, primary key(id))",
+		fetchSize:     nil,
+		namespaceName: nil,
+	}
+	client.handleExecuteUnparameterizedStatementRequest(query)
+	query = UnparameterizedStatementRequest{
+		language:      "sql",
+		statement:     "insert into mytable values(1, 1)",
+		fetchSize:     nil,
+		namespaceName: nil,
+	}
+	client.handleExecuteUnparameterizedStatementRequest(query)
+	query = UnparameterizedStatementRequest{
+		language:      "sql",
+		statement:     "insert into mytable values(2, 2)",
+		fetchSize:     nil,
+		namespaceName: nil,
+	}
+	client.handleExecuteUnparameterizedStatementRequest(query)
+	query = UnparameterizedStatementRequest{
+		language:      "sql",
+		statement:     "select * from mytable",
+		fetchSize:     nil,
+		namespaceName: nil,
+	}
+	client.handleCommitRequest()
+	result := client.handleExecuteUnparameterizedStatementRequest(query)
+	t.Log(result)
+}
+
+func TestHandleExecuteUnparameterizedStatementRequestMongo(t *testing.T) {
+	address := "localhost:20590"
+	username := "pa"
+	password := ""
+	client := handleConnectRequest(address, username, password)
+	query := UnparameterizedStatementRequest{
+		language:      "sql",
+		statement:     "drop table if exists mytable",
+		fetchSize:     nil,
+		namespaceName: nil,
+	}
+	client.handleExecuteUnparameterizedStatementRequest(query)
+	query = UnparameterizedStatementRequest{
+		language:      "sql",
+		statement:     "create table mytable(id int not null, yac int, primary key(id))",
+		fetchSize:     nil,
+		namespaceName: nil,
+	}
+	client.handleExecuteUnparameterizedStatementRequest(query)
+	query = UnparameterizedStatementRequest{
+		language:      "sql",
+		statement:     "insert into mytable values(1, 1)",
+		fetchSize:     nil,
+		namespaceName: nil,
+	}
+	client.handleExecuteUnparameterizedStatementRequest(query)
+	query = UnparameterizedStatementRequest{
+		language:      "sql",
+		statement:     "insert into mytable values(2, 2)",
+		fetchSize:     nil,
+		namespaceName: nil,
+	}
+	client.handleExecuteUnparameterizedStatementRequest(query)
+	client.handleCommitRequest()
+	query = UnparameterizedStatementRequest{
+		language:      "mongo",
+		statement:     "db.mytable.find()",
+		fetchSize:     nil,
+		namespaceName: nil,
+	}
+	result := client.handleExecuteUnparameterizedStatementRequest(query)
+	t.Log(result)
+}
