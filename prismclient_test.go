@@ -1,0 +1,142 @@
+package polypheny
+
+import (
+	bytes "bytes"
+	prism "polypheny/protos"
+	testing "testing"
+)
+
+func TestNewConnection(t *testing.T) {
+	conn := newConnection("localhost:20590", "pa")
+	defer conn.conn.Close()
+	if conn.isConnected != statusServerConnected {
+		t.Fatalf("Failed to make a connection. The current status is %v", conn.isConnected)
+	}
+}
+
+func TestSerialize(t *testing.T) {
+	conn := newConnection("localhost:20590", "pa")
+	username := "pa"
+	password := ""
+	request := prism.Request{
+		Type: &prism.Request_ConnectionRequest{
+			ConnectionRequest: &prism.ConnectionRequest{
+				MajorApiVersion: majorApiVersion,
+				MinorApiVersion: minorApiVersion,
+				Username:        &username,
+				Password:        &password,
+			},
+		},
+	}
+	result := conn.serialize(&request)
+	expected := []byte{154, 1, 8, 8, 2, 42, 2, 112, 97, 50, 0}
+	if !bytes.Equal(result, expected) {
+		t.Fatalf("Error when serializing a request got %v,but expected %v", result, expected)
+	}
+}
+
+func TestSend(t *testing.T) {
+	conn := newConnection("localhost:20590", "pa")
+	username := "pa"
+	password := ""
+	request := prism.Request{
+		Type: &prism.Request_ConnectionRequest{
+			ConnectionRequest: &prism.ConnectionRequest{
+				MajorApiVersion: majorApiVersion,
+				MinorApiVersion: minorApiVersion,
+				Username:        &username,
+				Password:        &password,
+			},
+		},
+	}
+	conn.send(conn.serialize(&request))
+	conn.recv()
+}
+
+func TestRecv(t *testing.T) {
+	conn := newConnection("localhost:20590", "pa")
+	username := "pa"
+	password := ""
+	request := prism.Request{
+		Type: &prism.Request_ConnectionRequest{
+			ConnectionRequest: &prism.ConnectionRequest{
+				MajorApiVersion: majorApiVersion,
+				MinorApiVersion: minorApiVersion,
+				Username:        &username,
+				Password:        &password,
+			},
+		},
+	}
+	conn.send(conn.serialize(&request))
+	result := conn.recv()
+	expected := []byte{16, 1, 98, 4, 8, 1, 16, 2}
+	if !bytes.Equal(result, expected) {
+		t.Fatalf("Error when receiving a response got %v,but expected %v", result, expected)
+	}
+}
+
+func TestClose(t *testing.T) {
+	conn := newConnection("localhost:20590", "pa")
+	conn.close()
+	if conn.isConnected != statusDisconnected {
+		t.Fatalf("Failed to disconnect, the current client status is %v", conn.isConnected)
+	}
+}
+
+func TestHelperSendAndRecv(t *testing.T) {
+	conn := newConnection("localhost:20590", "pa")
+	username := "pa"
+	password := ""
+	request := prism.Request{
+		Type: &prism.Request_ConnectionRequest{
+			ConnectionRequest: &prism.ConnectionRequest{
+				MajorApiVersion: majorApiVersion,
+				MinorApiVersion: minorApiVersion,
+				Username:        &username,
+				Password:        &password,
+			},
+		},
+	}
+	response := conn.helperSendAndRecv(&request)
+	if response.GetConnectionResponse().GetIsCompatible() != true {
+		t.Fatalf("The connection response is not correct")
+	}
+}
+
+func TestHandleConnectRequest(t *testing.T) {
+	address := "localhost:20590"
+	username := "pa"
+	password := ""
+	client := handleConnectRequest(address, username, password)
+	if client.isConnected != statusPolyphenyConnected {
+		t.Fatalf("Failed to connect to Polypheny, the current client status is %v", client.isConnected)
+	}
+}
+
+func TestHandleConnectionPropertiesUpdateRequest(t *testing.T) {
+	address := "localhost:20590"
+	username := "pa"
+	password := ""
+	client := handleConnectRequest(address, username, password)
+	isAutoCommit := true
+	client.handleConnectionPropertiesUpdateRequest(&isAutoCommit, nil)
+}
+
+func TestHandleConnectionCheckRequest(t *testing.T) {
+	address := "localhost:20590"
+	username := "pa"
+	password := ""
+	client := handleConnectRequest(address, username, password)
+	client.handleConnectionCheckRequest()
+}
+
+func TestHandleDisconnectRequest(t *testing.T) {
+	address := "localhost:20590"
+	username := "pa"
+	password := ""
+	client := handleConnectRequest(address, username, password)
+	client.handleDisconnectRequest()
+	if client.isConnected != statusDisconnected {
+		t.Fatalf("Failed to disconnect, the current client status is %v", client.isConnected)
+	}
+}
