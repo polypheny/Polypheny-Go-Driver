@@ -165,3 +165,15 @@ func TestMakeProtoValue1(t *testing.T) {
 		t.Fatalf("Error in making a ProtoValue, expected %v, got %v", value, result.GetString_().GetString_())
 	}
 }
+
+func TestConvertProtoValue(t *testing.T) {
+	var protoValue *prism.ProtoValue
+	var result interface{}
+	var expected interface{}
+	expected = true
+	protoValue = makeProtoValue(expected)
+	result = convertProtoValue(protoValue)
+	if result.(bool) != expected {
+		t.Fatalf("Failed to convert, expected %v, but got %v", expected, result)
+	}
+}
