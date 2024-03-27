@@ -113,7 +113,8 @@ type ParameterMetaResponse struct {
 	name          string
 }
 
-func newConnection(address string, username string) *prismClient { // TODO: is there a better way to pass password?
+func newConnection(address string, username string) *prismClient {
+	// This function is used to establish a low-level tcp connection, not a higher level polypheny connection
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
 		log.Fatal(err)

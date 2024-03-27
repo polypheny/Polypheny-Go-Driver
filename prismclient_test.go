@@ -140,3 +140,28 @@ func TestHandleDisconnectRequest(t *testing.T) {
 		t.Fatalf("Failed to disconnect, the current client status is %v", client.isConnected)
 	}
 }
+
+func TestMakeProtoValue1(t *testing.T) {
+	var result *prism.ProtoValue
+	var value interface{}
+	value = true
+	result = makeProtoValue(value)
+	if result.GetBoolean().GetBoolean() != true {
+		t.Fatalf("Error in making a ProtoValue, expected %v, got %v", value, result.GetBoolean().GetBoolean())
+	}
+	value = int32(1)
+	result = makeProtoValue(value)
+	if result.GetInteger().GetInteger() != value.(int32) {
+		t.Fatalf("Error in making a ProtoValue, expected %v, got %v", value, result.GetInteger().GetInteger())
+	}
+	value = int64(100000000000)
+	result = makeProtoValue(value)
+	if result.GetLong().GetLong() != value.(int64) {
+		t.Fatalf("Error in making a ProtoValue, expected %v, got %v", value, result.GetLong().GetLong())
+	}
+	value = "Hello, world!"
+	result = makeProtoValue(value)
+	if result.GetString_().GetString_() != value.(string) {
+		t.Fatalf("Error in making a ProtoValue, expected %v, got %v", value, result.GetString_().GetString_())
+	}
+}
