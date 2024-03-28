@@ -2,7 +2,7 @@ package polypheny
 
 import (
 	bytes "bytes"
-	prism "polypheny/protos"
+	prism "github.com/polypheny/Polypheny-Go-Driver/protos"
 	testing "testing"
 )
 

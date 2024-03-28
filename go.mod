@@ -1,4 +1,4 @@
-module polypheny
+module github.com/polypheny/Polypheny-Go-Driver
 
 go 1.22.1
 

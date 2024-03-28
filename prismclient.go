@@ -2,9 +2,9 @@ package polypheny
 
 import (
 	binary "encoding/binary"
+	prism "github.com/polypheny/Polypheny-Go-Driver/protos"
 	log "log"
 	net "net"
-	prism "polypheny/protos"
 
 	proto "google.golang.org/protobuf/proto"
 )
