@@ -350,8 +350,8 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query Unparam
 		relationalData := frame.GetRelationalFrame()
 		columnResponse := relationalData.GetColumnMeta()
 		columns = make([]string, len(columnResponse))
-		for _, v := range columnResponse {
-			columns = append(columns, v.GetColumnName())
+		for i, v := range columnResponse {
+			columns[i] = v.GetColumnName()
 		}
 		rows := relationalData.GetRows()
 		var currentRow []interface{}
