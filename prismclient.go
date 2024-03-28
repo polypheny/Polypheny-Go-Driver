@@ -315,7 +315,7 @@ func makeProtoValue(value interface{}) *prism.ProtoValue {
 	return &result
 }
 
-func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query UnparameterizedStatementRequest) [][]interface{} {
+func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query UnparameterizedStatementRequest) ([]string, [][]interface{}) {
 	request := prism.Request{
 		Type: &prism.Request_ExecuteUnparameterizedStatementRequest{
 			ExecuteUnparameterizedStatementRequest: &prism.ExecuteUnparameterizedStatementRequest{
@@ -334,19 +334,25 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query Unparam
 	buf = c.recv() // this is the query result
 	proto.Unmarshal(buf, &response)
 	if requestID != response.GetStatementResponse().GetStatementId() {
-		return nil
+		return nil, nil
 	}
 	if response.GetStatementResponse().GetResult() == nil {
-		return nil
+		return nil, nil
 	}
 	if response.GetStatementResponse().GetResult().GetFrame() == nil {
-		return nil
+		return nil, nil
 	}
 
 	frame := response.GetStatementResponse().GetResult().GetFrame()
 	var values [][]interface{}
+	var columns []string
 	if frame.GetRelationalFrame() != nil {
 		relationalData := frame.GetRelationalFrame()
+		columnResponse := relationalData.GetColumnMeta()
+		columns = make([]string, len(columnResponse))
+		for _, v := range columnResponse {
+			columns = append(columns, v.GetColumnName())
+		}
 		rows := relationalData.GetRows()
 		var currentRow []interface{}
 		for _, irow := range rows {
@@ -356,7 +362,7 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query Unparam
 			}
 			values = append(values, currentRow)
 		}
-		return values
+		return columns, values
 	} else if frame.GetDocumentFrame() != nil {
 		documentData := frame.GetDocumentFrame().GetDocuments()
 		var kv documentKeyValuePair
@@ -370,10 +376,13 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query Unparam
 			}
 			values = append(values, currentDocument)
 		}
-		return values
+		columns = make([]string, 2)
+		columns = append(columns, "key")
+		columns = append(columns, "value")
+		return columns, values
 	} else {
 		// graph is currently not supported
-		return nil
+		return nil, nil
 	}
 
 }
@@ -381,7 +390,8 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query Unparam
 func (c *prismClient) handleExecuteUnparameterizedStatementBatchRequest(queries []UnparameterizedStatementRequest) [][][]interface{} {
 	var result [][][]interface{}
 	for _, query := range queries {
-		result = append(result, c.handleExecuteUnparameterizedStatementRequest(query))
+		_, response := c.handleExecuteUnparameterizedStatementRequest(query)
+		result = append(result, response)
 	}
 	return result
 }

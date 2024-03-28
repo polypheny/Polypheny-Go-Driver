@@ -59,6 +59,28 @@ type Conn struct {
 	conn prismClient
 }
 
+type Rows struct {
+	columns   []string
+	result    [][]interface{}
+	readIndex int
+}
+
+func (rows *Rows) Columns() []string {
+	return rows.columns
+}
+
+func (rows *Rows) Close() error {
+	return nil
+}
+
+func (rows *Rows) Next(dest []driver.Value) error {
+	for i, _ := range dest {
+		dest[i] = rows.result[rows.readIndex][i]
+	}
+	rows.readIndex++
+	return nil
+}
+
 func (c *Conn) Prepare(query string) (driver.Stmt, error) {
 	response := c.conn.handlePrepareIndexedStatementRequest(strings.Split(query, ":")[0], strings.Split(query, ":")[1], nil)
 	var key int32
@@ -93,8 +115,13 @@ func (c *Conn) QueryContext(ctx context.Context, query string, args []interface{
 		fetchSize:     nil,
 		namespaceName: nil,
 	}
-	c.conn.handleExecuteUnparameterizedStatementRequest(request)
-	return nil, nil
+	columns, result := c.conn.handleExecuteUnparameterizedStatementRequest(request)
+	rows := Rows{
+		columns:   columns,
+		result:    result,
+		readIndex: 0,
+	}
+	return &rows, nil
 }
 
 func init() {
