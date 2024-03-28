@@ -111,7 +111,7 @@ func (c *Conn) Begin() (driver.Tx, error) {
 	return nil, nil
 }
 
-func (c *Conn) QueryContext(ctx context.Context, query string, args []interface{}) (driver.Rows, error) {
+func (c *Conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	// TODO: support args
 	request := UnparameterizedStatementRequest{
 		language:      strings.Split(query, ":")[0],
