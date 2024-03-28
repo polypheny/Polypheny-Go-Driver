@@ -3,6 +3,7 @@ package polypheny
 import (
 	sql "database/sql"
 	driver "database/sql/driver"
+	"io"
 	"strings"
 
 	"golang.org/x/net/context"
@@ -74,6 +75,9 @@ func (rows *Rows) Close() error {
 }
 
 func (rows *Rows) Next(dest []driver.Value) error {
+	if rows.readIndex >= len(rows.result) {
+		return io.EOF
+	}
 	for i, _ := range dest {
 		dest[i] = rows.result[rows.readIndex][i]
 	}
