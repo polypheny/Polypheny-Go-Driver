@@ -366,19 +366,22 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query Unparam
 	} else if frame.GetDocumentFrame() != nil {
 		documentData := frame.GetDocumentFrame().GetDocuments()
 		var kv documentKeyValuePair
-		var currentDocument []interface{}
+		//var currentDocument []interface{}
 		for _, entries := range documentData {
-			currentDocument = []interface{}{}
+			//currentDocument = []interface{}{}
 			for _, v := range entries.GetEntries() {
 				kv.key = convertProtoValue(v.GetKey())
 				kv.value = convertProtoValue(v.GetValue())
-				currentDocument = append(currentDocument, kv)
+				//currentDocument = append(currentDocument, kv)
+				currentRow := make([]interface{}, 2)
+				currentRow[0] = kv.key
+				currentRow[1] = kv.value
+				values = append(values, currentRow)
 			}
-			values = append(values, currentDocument)
 		}
 		columns = make([]string, 2)
-		columns = append(columns, "key")
-		columns = append(columns, "value")
+		columns[0] = "key"
+		columns[1] = "value"
 		return columns, values
 	} else {
 		// graph is currently not supported

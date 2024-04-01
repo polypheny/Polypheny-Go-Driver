@@ -14,7 +14,12 @@ type emps struct {
 	commission int32
 }
 
-func TestFlow(t *testing.T) {
+type mongo struct {
+	key   string
+	value any
+}
+
+func TestSQLFlow(t *testing.T) {
 	db, _ := sql.Open("polypheny", "localhost:20590,pa:")
 	rows, _ := db.QueryContext(context.Background(), "sql:select * from emps")
 	t.Log(rows.Columns())
@@ -22,5 +27,16 @@ func TestFlow(t *testing.T) {
 		emp := new(emps)
 		rows.Scan(&emp.empid, &emp.deptno, &emp.name, &emp.salary, &emp.commission)
 		t.Log(emp)
+	}
+}
+
+func TestMongoFlow(t *testing.T) {
+	db, _ := sql.Open("polypheny", "localhost:20590,pa:")
+	rows, _ := db.QueryContext(context.Background(), "mongo:db.emps.find()")
+	t.Log(rows.Columns())
+	for rows.Next() {
+		mongo := new(mongo)
+		rows.Scan(&mongo.key, &mongo.value)
+		t.Log(mongo)
 	}
 }
