@@ -40,3 +40,23 @@ func TestMongoFlow(t *testing.T) {
 		t.Log(mongo)
 	}
 }
+
+type mytable struct {
+	id  int32
+	yac int32
+}
+
+func TestExecFlow(t *testing.T) {
+	db, _ := sql.Open("polypheny", "localhost:20590,pa:")
+	db.ExecContext(context.Background(), "sql:drop table if exists mytable")
+	db.ExecContext(context.Background(), "sql:create table mytable(id int not null, yac int, primary key(id))")
+	db.ExecContext(context.Background(), "sql:insert into mytable values(1, 1)")
+	db.ExecContext(context.Background(), "sql:insert into mytable values(2, 2)")
+	rows, _ := db.QueryContext(context.Background(), "sql:select * from mytable")
+	t.Log(rows.Columns())
+	for rows.Next() {
+		temp := new(mytable)
+		rows.Scan(&temp.id, &temp.yac)
+		t.Log(temp)
+	}
+}

@@ -111,6 +111,18 @@ func (c *Conn) Begin() (driver.Tx, error) {
 	return nil, nil
 }
 
+func (c *Conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	// TODO: need to add support to the last insert ID
+	request := UnparameterizedStatementRequest{
+		language:      strings.Split(query, ":")[0],
+		statement:     strings.Split(query, ":")[1],
+		fetchSize:     nil,
+		namespaceName: nil,
+	}
+	c.conn.handleExecuteUnparameterizedStatementRequest(request)
+	return nil, nil
+}
+
 func (c *Conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	// TODO: support args
 	request := UnparameterizedStatementRequest{
