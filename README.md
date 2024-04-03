@@ -7,17 +7,23 @@
 </p> 
 
 
-# Polypheny-DB Go Driver WIP
+# Polypheny-DB Go Driver
 
 
-A Polypheny-DB Driver for the Go programming language.
+A Polypheny-DB Driver for the Go programming language which supports multiple models and query languages.
 
 
 ## Installation
 
-To use this driver in a Go project, simply import the package.
+To install and use the Go driver in a project, simply import this repo and the sql package of Go and then run *go mod tidy*. User may also need the context package.
 
-`import "github.com/polypheny/Polypheny-Go-Driver"`.
+```
+import (
+	_ "github.com/polypheny/Polypheny-Go-Driver"
+	"database/sql"
+    "context"
+)
+```
 
 A demo on how to use this driver can be found in [this](https://github.com/vlowingkloude/PolyphenyGoDriverDemo) repo.
 
