@@ -19,8 +19,8 @@ To install and use the Go driver in a project, simply import this repo and the s
 
 ```
 import (
-	_ "github.com/polypheny/Polypheny-Go-Driver"
-	"database/sql"
+    _ "github.com/polypheny/Polypheny-Go-Driver"
+    "database/sql"
     "context"
 )
 ```
