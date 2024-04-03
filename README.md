@@ -19,7 +19,7 @@ To use this driver in a Go project, simply import the package.
 
 `import "github.com/polypheny/Polypheny-Go-Driver"`.
 
-However, currently the proto files are not hosted at [Polypheny](https://polypheny.com). Instead, they are temporarily included in this repo without being complied. Therefore, before build a Go project, we need to compile these proto files and run `go mod edit -replace polypheny.com/protos=ProtoPath`. 
+A demo on how to use this driver can be found in [this](https://github.com/vlowingkloude/PolyphenyGoDriverDemo) repo.
 
 An in-depth and more detailed documentation can be found [here](https://docs.polypheny.com/en/latest/drivers/go/overview).
 
