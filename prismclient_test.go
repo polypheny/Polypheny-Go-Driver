@@ -218,7 +218,8 @@ func TestHandleExecuteUnparameterizedStatementRequestSql(t *testing.T) {
 		namespaceName: nil,
 	}
 	client.handleCommitRequest()
-	columns, result := client.handleExecuteUnparameterizedStatementRequest(query)
+	affectedRows, columns, result := client.handleExecuteUnparameterizedStatementRequest(query)
+	t.Log(affectedRows)
 	t.Log(columns)
 	t.Log(result)
 }
@@ -263,7 +264,8 @@ func TestHandleExecuteUnparameterizedStatementRequestMongo(t *testing.T) {
 		fetchSize:     nil,
 		namespaceName: nil,
 	}
-	columns, result := client.handleExecuteUnparameterizedStatementRequest(query)
+	affectedRows, columns, result := client.handleExecuteUnparameterizedStatementRequest(query)
+	t.Log(affectedRows)
 	t.Log(columns)
 	t.Log(result)
 }

@@ -315,7 +315,7 @@ func makeProtoValue(value interface{}) *prism.ProtoValue {
 	return &result
 }
 
-func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query UnparameterizedStatementRequest) ([]string, [][]interface{}) {
+func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query UnparameterizedStatementRequest) (int64, []string, [][]interface{}) {
 	request := prism.Request{
 		Type: &prism.Request_ExecuteUnparameterizedStatementRequest{
 			ExecuteUnparameterizedStatementRequest: &prism.ExecuteUnparameterizedStatementRequest{
@@ -334,13 +334,14 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query Unparam
 	buf = c.recv() // this is the query result
 	proto.Unmarshal(buf, &response)
 	if requestID != response.GetStatementResponse().GetStatementId() {
-		return nil, nil
+		return 0, nil, nil
 	}
 	if response.GetStatementResponse().GetResult() == nil {
-		return nil, nil
+		return 0, nil, nil
 	}
+	affectedRows := response.GetStatementResponse().GetResult().GetScalar()
 	if response.GetStatementResponse().GetResult().GetFrame() == nil {
-		return nil, nil
+		return affectedRows, nil, nil
 	}
 
 	frame := response.GetStatementResponse().GetResult().GetFrame()
@@ -362,7 +363,7 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query Unparam
 			}
 			values = append(values, currentRow)
 		}
-		return columns, values
+		return affectedRows, columns, values
 	} else if frame.GetDocumentFrame() != nil {
 		documentData := frame.GetDocumentFrame().GetDocuments()
 		var kv documentKeyValuePair
@@ -382,10 +383,10 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query Unparam
 		columns = make([]string, 2)
 		columns[0] = "key"
 		columns[1] = "value"
-		return columns, values
+		return affectedRows, columns, values
 	} else {
 		// graph is currently not supported
-		return nil, nil
+		return 0, nil, nil
 	}
 
 }
@@ -393,7 +394,7 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query Unparam
 func (c *prismClient) handleExecuteUnparameterizedStatementBatchRequest(queries []UnparameterizedStatementRequest) [][][]interface{} {
 	var result [][][]interface{}
 	for _, query := range queries {
-		_, response := c.handleExecuteUnparameterizedStatementRequest(query)
+		_, _, response := c.handleExecuteUnparameterizedStatementRequest(query)
 		result = append(result, response)
 	}
 	return result

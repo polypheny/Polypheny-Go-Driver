@@ -66,6 +66,19 @@ type Rows struct {
 	readIndex int
 }
 
+type ExecResult struct {
+	lastInsertId int64
+	affectedRows int64
+}
+
+func (r *ExecResult) LastInsertId() (int64, error) {
+	return 0, nil
+}
+
+func (r *ExecResult) RowsAffected() (int64, error) {
+	return r.affectedRows, nil
+}
+
 func (rows *Rows) Columns() []string {
 	return rows.columns
 }
@@ -119,8 +132,12 @@ func (c *Conn) ExecContext(ctx context.Context, query string, args []driver.Name
 		fetchSize:     nil,
 		namespaceName: nil,
 	}
-	c.conn.handleExecuteUnparameterizedStatementRequest(request)
-	return nil, nil
+	affectedRows, _, _ := c.conn.handleExecuteUnparameterizedStatementRequest(request)
+	result := ExecResult{
+		lastInsertId: 0,
+		affectedRows: affectedRows,
+	}
+	return &result, nil
 }
 
 func (c *Conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
@@ -131,7 +148,7 @@ func (c *Conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 		fetchSize:     nil,
 		namespaceName: nil,
 	}
-	columns, result := c.conn.handleExecuteUnparameterizedStatementRequest(request)
+	_, columns, result := c.conn.handleExecuteUnparameterizedStatementRequest(request)
 	rows := Rows{
 		columns:   columns,
 		result:    result,

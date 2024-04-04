@@ -43,15 +43,21 @@ func TestMongoFlow(t *testing.T) {
 
 type mytable struct {
 	id  int32
-	yac int32
+	yac string
 }
 
 func TestExecFlow(t *testing.T) {
 	db, _ := sql.Open("polypheny", "localhost:20590,pa:")
-	db.ExecContext(context.Background(), "sql:drop table if exists mytable")
-	db.ExecContext(context.Background(), "sql:create table mytable(id int not null, yac int, primary key(id))")
-	db.ExecContext(context.Background(), "sql:insert into mytable values(1, 1)")
-	db.ExecContext(context.Background(), "sql:insert into mytable values(2, 2)")
+	result, _ := db.ExecContext(context.Background(), "sql:drop table if exists mytable")
+	t.Log(result.RowsAffected())
+	result, _ = db.ExecContext(context.Background(), "sql:create table mytable(id int not null, yac varchar(10), primary key(id))")
+	t.Log(result.RowsAffected())
+	result, _ = db.ExecContext(context.Background(), "sql:insert into mytable values(1, 'hello')")
+	t.Log(result.RowsAffected())
+	result, _ = db.ExecContext(context.Background(), "sql:insert into mytable values(2, 'world')")
+	t.Log(result.RowsAffected())
+	result, _ = db.ExecContext(context.Background(), "sql:update mytable set yac = 'polypheny' where id in (select id from mytable where id = 1 or id = 2)")
+	t.Log(result.RowsAffected())
 	rows, _ := db.QueryContext(context.Background(), "sql:select * from mytable")
 	t.Log(rows.Columns())
 	for rows.Next() {
