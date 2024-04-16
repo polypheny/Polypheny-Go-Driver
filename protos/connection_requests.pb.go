@@ -219,7 +219,7 @@ func (x *ConnectionProperties) GetNamespaceName() string {
 	return ""
 }
 
-// The ConnectionCheckRequest message in combination with the corresponding remot procedure call is utilized to verify the current state of an established connection.
+// The ConnectionCheckRequest message in combination with the corresponding remote procedure call is utilized to verify the current state of an established connection.
 // It acts as a simple “ping” request, enabling clients to ascertain if the server is responsive and if the connection is still valid.
 // This message does not contain any fields. It simply acts as an indicator to prompt the server for a ConnectionCheckResponse.
 type DisconnectRequest struct {
@@ -260,7 +260,7 @@ func (*DisconnectRequest) Descriptor() ([]byte, []int) {
 	return file_polyprism_connection_requests_proto_rawDescGZIP(), []int{3}
 }
 
-// The ConnectionCheckRequest message in combination with the corresponding remot procedure call is utilized to verify the current state of an established connection.
+// The ConnectionCheckRequest message in combination with the corresponding remote procedure call is utilized to verify the current state of an established connection.
 // It acts as a simple “ping” request, enabling clients to ascertain if the server is responsive and if the connection is still valid.
 type ConnectionCheckRequest struct {
 	state         protoimpl.MessageState
