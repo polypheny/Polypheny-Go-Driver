@@ -169,8 +169,7 @@ func TestMakeProtoValue1(t *testing.T) {
 func TestConvertProtoValue(t *testing.T) {
 	var protoValue *prism.ProtoValue
 	var result interface{}
-	var expected interface{}
-	expected = true
+	var expected interface{} = true
 	protoValue = makeProtoValue(expected)
 	result = convertProtoValue(protoValue)
 	if result.(bool) != expected {

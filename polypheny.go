@@ -91,7 +91,7 @@ func (rows *Rows) Next(dest []driver.Value) error {
 	if rows.readIndex >= len(rows.result) {
 		return io.EOF
 	}
-	for i, _ := range dest {
+	for i := range dest {
 		dest[i] = rows.result[rows.readIndex][i]
 	}
 	rows.readIndex++

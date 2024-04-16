@@ -677,22 +677,14 @@ func (c *prismClient) handleLanguageRequest() []string {
 	return response.GetLanguageResponse().GetLanguageNames()
 }
 
-func (c *prismClient) handleDatabaseRequest() []DatabaseEntryResponse {
+func (c *prismClient) handleDefaultNamespaceRequest() string {
 	request := prism.Request{
-		Type: &prism.Request_DatabasesRequest{
-			DatabasesRequest: &prism.DatabasesRequest{},
+		Type: &prism.Request_DefaultNamespaceRequest{
+			DefaultNamespaceRequest: &prism.DefaultNamespaceRequest{},
 		},
 	}
 	response := c.helperSendAndRecv(&request)
-	var result []DatabaseEntryResponse
-	for _, entry := range response.GetDatabasesResponse().GetDatabases() {
-		result = append(result, DatabaseEntryResponse{
-			databaseName:         entry.GetDatabaseName(),
-			ownerName:            entry.GetOwnerName(),
-			defaultNamespaceName: entry.GetDefaultNamespaceName(),
-		})
-	}
-	return result
+	return response.GetDefaultNamespaceResponse().GetDefaultNamespace()
 }
 
 func (c *prismClient) handleTableTypeRequest() []string {
