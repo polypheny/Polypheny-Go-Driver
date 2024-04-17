@@ -15,8 +15,11 @@ type emps struct {
 }
 
 type mongo struct {
-	key   string
-	value any
+	empid      int32
+	commission int32
+	salary     int32
+	deptno     int32
+	name       string
 }
 
 func TestSQLFlow(t *testing.T) {
@@ -36,7 +39,7 @@ func TestMongoFlow(t *testing.T) {
 	t.Log(rows.Columns())
 	for rows.Next() {
 		mongo := new(mongo)
-		rows.Scan(&mongo.key, &mongo.value)
+		rows.Scan(&mongo.empid, &mongo.commission, &mongo.salary, &mongo.deptno, &mongo.name)
 		t.Log(mongo)
 	}
 }

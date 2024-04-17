@@ -321,11 +321,11 @@ func canConvertDocumentToRelational(documents []*prism.ProtoDocument) (bool, []s
 	for _, document := range documents {
 		if isFirst {
 			isFirst = false
-			for _, kvpair := range document.GetEntries() {
+			for i, kvpair := range document.GetEntries() {
 				key := convertProtoValue(kvpair.GetKey())
 				switch key.(type) {
 				case string:
-					keys = append(keys, key.(string))
+					keys[i] = key.(string)
 				default:
 					return false, nil
 				}
@@ -335,7 +335,7 @@ func canConvertDocumentToRelational(documents []*prism.ProtoDocument) (bool, []s
 				return false, nil
 			}
 			for i, kvpair := range document.GetEntries() {
-				key := convertProtoValue(kvpair.GetValue())
+				key := convertProtoValue(kvpair.GetKey())
 				switch key.(type) {
 				case string:
 					if key.(string) != keys[i] {
