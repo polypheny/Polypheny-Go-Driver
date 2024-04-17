@@ -315,6 +315,41 @@ func makeProtoValue(value interface{}) *prism.ProtoValue {
 	return &result
 }
 
+func canConvertDocumentToRelational(documents []*prism.ProtoDocument) (bool, []string) {
+	keys := make([]string, len(documents[0].GetEntries()))
+	isFirst := true
+	for _, document := range documents {
+		if isFirst {
+			isFirst = false
+			for _, kvpair := range document.GetEntries() {
+				key := convertProtoValue(kvpair.GetKey())
+				switch key.(type) {
+				case string:
+					keys = append(keys, key.(string))
+				default:
+					return false, nil
+				}
+			}
+		} else {
+			if len(document.GetEntries()) != len(keys) {
+				return false, nil
+			}
+			for i, kvpair := range document.GetEntries() {
+				key := convertProtoValue(kvpair.GetValue())
+				switch key.(type) {
+				case string:
+					if key.(string) != keys[i] {
+						return false, nil
+					}
+				default:
+					return false, nil
+				}
+			}
+		}
+	}
+	return true, keys
+}
+
 func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query UnparameterizedStatementRequest) (int64, []string, [][]interface{}) {
 	request := prism.Request{
 		Type: &prism.Request_ExecuteUnparameterizedStatementRequest{
@@ -366,8 +401,20 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query Unparam
 		return affectedRows, columns, values
 	} else if frame.GetDocumentFrame() != nil {
 		documentData := frame.GetDocumentFrame().GetDocuments()
+		canConvert, columns := canConvertDocumentToRelational(documentData)
 		var kv documentKeyValuePair
 		//var currentDocument []interface{}
+		if canConvert {
+			var currentRow []interface{}
+			for _, document := range documentData {
+				currentRow = make([]interface{}, len(columns))
+				for i, kvpair := range document.GetEntries() {
+					currentRow[i] = convertProtoValue(kvpair.GetValue())
+				}
+				values = append(values, currentRow)
+			}
+			return affectedRows, columns, values
+		}
 		for _, entries := range documentData {
 			//currentDocument = []interface{}{}
 			for _, v := range entries.GetEntries() {
