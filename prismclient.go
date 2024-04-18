@@ -137,9 +137,14 @@ func newConnection(address string, username string) *prismClient {
 	buf := make([]byte, recvLength)
 	(&client).conn.Read(buf)
 	if !bytes.Equal(buf, []byte(transportVersion)) {
+		// close the connection
+		(&client).close()
 		log.Fatal("The transport version is incompatible with server")
 	}
 	// same here, cant use send
+	if len(transportVersion) >= 128 {
+		log.Fatal("The transport version is too long (>= 128)")
+	}
 	binary.LittleEndian.PutUint64(length, uint64(len(transportVersion)))
 	rawLength[0] = length[0]
 	(&client).conn.Write(rawLength)
@@ -156,6 +161,7 @@ func (c *prismClient) serialize(m proto.Message) []byte {
 }
 
 func (c *prismClient) send(serialized []byte) {
+	// TODO: do we need to change fixed 8 here to a parameter?
 	length := make([]byte, 8)
 	binary.LittleEndian.PutUint32(length, uint32(len(serialized)))
 	c.conn.Write(length)
@@ -163,6 +169,7 @@ func (c *prismClient) send(serialized []byte) {
 }
 
 func (c *prismClient) recv() []byte {
+	// TODO: do we need to change fixed 8 here to a parameter?
 	length := make([]byte, 8)
 	c.conn.Read(length)
 	recvLength := binary.LittleEndian.Uint64(length)
@@ -424,6 +431,9 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query Unparam
 		var kv documentKeyValuePair
 		//var currentDocument []interface{}
 		if canConvert {
+			// if the documents have exactly the same schema
+			// we will transform the query result into relational
+			// the key will be the column name
 			var currentRow []interface{}
 			for _, document := range documentData {
 				currentRow = make([]interface{}, len(columns))
@@ -434,6 +444,8 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query Unparam
 			}
 			return affectedRows, columns, values
 		}
+		// if we can't transform
+		// TODO: need a better way to return the result
 		for _, entries := range documentData {
 			//currentDocument = []interface{}{}
 			for _, v := range entries.GetEntries() {
