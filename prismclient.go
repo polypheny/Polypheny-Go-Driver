@@ -1,17 +1,20 @@
 package polypheny
 
 import (
+	"bytes"
 	binary "encoding/binary"
-	prism "github.com/polypheny/Polypheny-Go-Driver/protos"
 	log "log"
 	net "net"
+
+	prism "github.com/polypheny/Polypheny-Go-Driver/protos"
 
 	proto "google.golang.org/protobuf/proto"
 )
 
 const (
-	majorApiVersion = 2
-	minorApiVersion = 0
+	majorApiVersion  = 2
+	minorApiVersion  = 0
+	transportVersion = "plain-v1@polypheny.com\n"
 )
 
 const (
@@ -125,6 +128,22 @@ func newConnection(address string, username string) *prismClient {
 		conn:        conn,
 		isConnected: statusServerConnected,
 	}
+	// exchange transport version
+	// since here the size is represented by one byte, we cant really call recv to do the job
+	rawLength := make([]byte, 1)
+	(&client).conn.Read(rawLength)
+	length := []byte{rawLength[0], 0, 0, 0, 0, 0, 0, 0}
+	recvLength := binary.LittleEndian.Uint64(length)
+	buf := make([]byte, recvLength)
+	(&client).conn.Read(buf)
+	if !bytes.Equal(buf, []byte(transportVersion)) {
+		log.Fatal("The transport version is incompatible with server")
+	}
+	// same here, cant use send
+	binary.LittleEndian.PutUint64(length, uint64(len(transportVersion)))
+	rawLength[0] = length[0]
+	(&client).conn.Write(rawLength)
+	(&client).conn.Write([]byte(transportVersion))
 	return &client
 }
 
