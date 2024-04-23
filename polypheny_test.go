@@ -39,7 +39,7 @@ func TestMongoFlow(t *testing.T) {
 	t.Log(rows.Columns())
 	for rows.Next() {
 		mongo := new(mongo)
-		rows.Scan(&mongo.empid, &mongo.commission, &mongo.salary, &mongo.deptno, &mongo.name)
+		rows.Scan(&mongo.name, &mongo.deptno, &mongo.salary, &mongo.empid, &mongo.commission)
 		t.Log(mongo)
 	}
 }

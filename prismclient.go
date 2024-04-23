@@ -503,12 +503,17 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query Unparam
 			var currentRow []interface{}
 			for _, document := range documentData {
 				currentRow = make([]interface{}, len(columns))
-				for i, kvpair := range document.GetEntries() {
-					converted, err := convertProtoValue(kvpair.GetValue())
-					if err != nil {
-						return -1, nil, nil, err
+				for _, kvpair := range document.GetEntries() {
+					key, _ := convertProtoValue(kvpair.GetKey())
+					for ki, k := range columns {
+						if key == k {
+							converted, err := convertProtoValue(kvpair.GetValue())
+							if err != nil {
+								return -1, nil, nil, err
+							}
+							currentRow[ki] = converted
+						}
 					}
-					currentRow[i] = converted
 				}
 				values = append(values, currentRow)
 			}
