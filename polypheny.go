@@ -98,6 +98,11 @@ func (rows *Rows) Next(dest []driver.Value) error {
 	return nil
 }
 
+func (c *Conn) Ping(ctx context.Context) error {
+	c.conn.handleConnectionCheckRequest()
+	return nil
+}
+
 func (c *Conn) Prepare(query string) (driver.Stmt, error) {
 	response := c.conn.handlePrepareIndexedStatementRequest(strings.Split(query, ":")[0], strings.Split(query, ":")[1], nil)
 	var key int32
