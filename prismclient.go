@@ -745,16 +745,6 @@ func (c *prismClient) handleDbmsVersionRequest() PolyphenyVersionResponse {
 	return result
 }
 
-func (c *prismClient) handleLanguageRequest() []string {
-	request := prism.Request{
-		Type: &prism.Request_LanguageRequest{
-			LanguageRequest: &prism.LanguageRequest{},
-		},
-	}
-	response := c.helperSendAndRecv(&request)
-	return response.GetLanguageResponse().GetLanguageNames()
-}
-
 func (c *prismClient) handleDefaultNamespaceRequest() string {
 	request := prism.Request{
 		Type: &prism.Request_DefaultNamespaceRequest{
@@ -799,27 +789,6 @@ func (c *prismClient) handleTypesRequest() []TypeResponse {
 			minScale:        t.GetMinScale(),
 			maxScale:        t.GetMaxScale(),
 			radix:           t.GetRadix(),
-		})
-	}
-	return result
-}
-
-func (c *prismClient) handleUserDefinedTypesRequest() []UserDefinedTypesResponse {
-	request := prism.Request{
-		Type: &prism.Request_UserDefinedTypesRequest{
-			UserDefinedTypesRequest: &prism.UserDefinedTypesRequest{},
-		},
-	}
-	response := c.helperSendAndRecv(&request)
-	var result []UserDefinedTypesResponse
-	for _, t := range response.GetUserDefinedTypesResponse().GetUserDefinedTypes() {
-		var metaValues []string
-		for _, metaValue := range t.GetValueMetas() {
-			metaValues = append(metaValues, metaValue.GetValueName())
-		}
-		result = append(result, UserDefinedTypesResponse{
-			typeName:   t.GetTypeName(),
-			metaValues: metaValues,
 		})
 	}
 	return result
@@ -908,25 +877,6 @@ func (c *prismClient) handleClientInfoPropertiesRequest() map[string]string {
 	return response.GetClientInfoPropertiesResponse().GetProperties()
 }
 
-func (c *prismClient) handleClientInfoPropertyMetaRequest() []ClientInfoPropertyMetaResponse {
-	request := prism.Request{
-		Type: &prism.Request_ClientInfoPropertyMetaRequest{
-			ClientInfoPropertyMetaRequest: &prism.ClientInfoPropertyMetaRequest{},
-		},
-	}
-	response := c.helperSendAndRecv(&request)
-	var result []ClientInfoPropertyMetaResponse
-	for _, entry := range response.GetClientInfoPropertyMetaResponse().GetClientInfoPropertyMetas() {
-		result = append(result, ClientInfoPropertyMetaResponse{
-			key:          entry.GetKey(),
-			defaultValue: entry.GetDefaultValue(),
-			maxLength:    entry.GetMaxlength(),
-			desc:         entry.GetDescription(),
-		})
-	}
-	return result
-}
-
 func (c *prismClient) handleFunctionsRequest(language string, category string) []FunctionsResponse {
 	request := prism.Request{
 		Type: &prism.Request_FunctionsRequest{
@@ -947,25 +897,6 @@ func (c *prismClient) handleFunctionsRequest(language string, category string) [
 		})
 	}
 	return result
-}
-
-func (c *prismClient) handleNamespaceRequest(namespaceName string) NamespaceResponse {
-	request := prism.Request{
-		Type: &prism.Request_NamespaceRequest{
-			NamespaceRequest: &prism.NamespaceRequest{
-				NamespaceName: namespaceName,
-			},
-		},
-	}
-	c.send(c.serialize(&request))
-	buf := c.recv()
-	var response prism.Namespace
-	proto.Unmarshal(buf, &response)
-	return NamespaceResponse{
-		namespaceName:   response.GetNamespaceName(),
-		isCaseSensitive: response.GetIsCaseSensitive(),
-		namespaceType:   response.GetNamespaceType(),
-	}
 }
 
 func (c *prismClient) handleNamespacesResponse(namespacePattern *string, namespaceType *string) []NamespaceResponse {
