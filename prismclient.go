@@ -3,7 +3,7 @@ package polypheny
 import (
 	"bytes"
 	binary "encoding/binary"
-	log "log"
+	"fmt"
 	net "net"
 
 	prism "github.com/polypheny/Polypheny-Go-Driver/protos"
@@ -116,11 +116,11 @@ type ParameterMetaResponse struct {
 	name          string
 }
 
-func newConnection(address string, username string) *prismClient {
+func newConnection(address string, username string) (*prismClient, error) {
 	// This function is used to establish a low-level tcp connection, not a higher level polypheny connection
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	client := prismClient{
 		address:     address,
@@ -131,71 +131,102 @@ func newConnection(address string, username string) *prismClient {
 	// exchange transport version
 	// since here the size is represented by one byte, we cant really call recv to do the job
 	rawLength := make([]byte, 1)
-	(&client).conn.Read(rawLength)
+	_, err = (&client).conn.Read(rawLength)
+	if err != nil {
+		return nil, err
+	}
 	length := []byte{rawLength[0], 0, 0, 0, 0, 0, 0, 0}
 	recvLength := binary.LittleEndian.Uint64(length)
 	buf := make([]byte, recvLength)
-	(&client).conn.Read(buf)
+	_, err = (&client).conn.Read(buf)
+	if err != nil {
+		return nil, err
+	}
 	if !bytes.Equal(buf, []byte(transportVersion)) {
 		// close the connection
 		(&client).close()
-		log.Fatal("The transport version is incompatible with server")
+		return nil, &ClientError{
+			message: "The transport version is incompatible with server",
+		}
 	}
 	// same here, cant use send
 	if len(transportVersion) >= 128 {
-		log.Fatal("The transport version is too long (>= 128)")
+		return nil, &ClientError{
+			message: "The transport version is too long (>= 128)",
+		}
 	}
 	binary.LittleEndian.PutUint64(length, uint64(len(transportVersion)))
 	rawLength[0] = length[0]
-	(&client).conn.Write(rawLength)
-	(&client).conn.Write([]byte(transportVersion))
-	return &client
-}
-
-func (c *prismClient) serialize(m proto.Message) []byte {
-	result, err := proto.Marshal(m)
+	_, err = (&client).conn.Write(rawLength)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	return result
+	_, err = (&client).conn.Write([]byte(transportVersion))
+	return &client, err
 }
 
-func (c *prismClient) send(serialized []byte) {
+func (c *prismClient) serialize(m proto.Message) ([]byte, error) {
+	result, err := proto.Marshal(m)
+	return result, err
+}
+
+func (c *prismClient) send(serialized []byte) error {
 	// TODO: do we need to change fixed 8 here to a parameter?
 	length := make([]byte, 8)
 	binary.LittleEndian.PutUint32(length, uint32(len(serialized)))
-	c.conn.Write(length)
-	c.conn.Write(serialized)
+	_, err := c.conn.Write(length)
+	if err != nil {
+		return err
+	}
+	_, err = c.conn.Write(serialized)
+	return err
 }
 
-func (c *prismClient) recv() []byte {
+func (c *prismClient) recv() ([]byte, error) {
 	// TODO: do we need to change fixed 8 here to a parameter?
 	length := make([]byte, 8)
-	c.conn.Read(length)
+	_, err := c.conn.Read(length)
+	if err != nil {
+		return nil, err
+	}
 	recvLength := binary.LittleEndian.Uint64(length)
 	buf := make([]byte, recvLength)
-	c.conn.Read(buf)
-	return buf
+	_, err = c.conn.Read(buf)
+	return buf, err
 }
 
-func (c *prismClient) close() {
+func (c *prismClient) close() error {
 	err := c.conn.Close()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	c.isConnected = statusDisconnected
+	c.isConnected = statusDisconnected //TODO: maybe add an error status
+	return nil
 }
 
-func (c *prismClient) helperSendAndRecv(m proto.Message) *prism.Response {
-	c.send(c.serialize(m))
-	buf := c.recv()
+func (c *prismClient) helperSendAndRecv(m proto.Message) (*prism.Response, error) {
+	buf, err := c.serialize(m)
+	if err != nil {
+		return nil, err
+	}
+	err = c.send(buf)
+	if err != nil {
+		return nil, err
+	}
+	buf, err = c.recv()
+	if err != nil {
+		return nil, err
+	}
 	var response prism.Response
-	proto.Unmarshal(buf, &response)
-	return &response
+	err = proto.Unmarshal(buf, &response)
+	return &response, err
 }
 
-func handleConnectRequest(address string, username string, password string) *prismClient {
-	client := newConnection(address, username)
+func handleConnectRequest(address string, username string, password string) (*prismClient, error) {
+	client, err := newConnection(address, username)
+	if err != nil {
+		return nil, err
+	}
 	request := prism.Request{
 		Type: &prism.Request_ConnectionRequest{
 			ConnectionRequest: &prism.ConnectionRequest{
@@ -206,17 +237,30 @@ func handleConnectRequest(address string, username string, password string) *pri
 			},
 		},
 	}
-	client.send(client.serialize(&request))
-	buf := client.recv()
+	serialized, err := client.serialize(&request)
+	if err != nil {
+		return nil, err
+	}
+	err = client.send(serialized)
+	if err != nil {
+		return nil, err
+	}
+	buf, err := client.recv()
+	if err != nil {
+		return nil, err
+	}
 	var response prism.Response
-	proto.Unmarshal(buf, &response)
+	err = proto.Unmarshal(buf, &response)
+	if err != nil {
+		return nil, err
+	}
 	if response.GetConnectionResponse().IsCompatible {
 		client.isConnected = statusPolyphenyConnected
 	}
-	return client
+	return client, nil
 }
 
-func (c *prismClient) handleConnectionPropertiesUpdateRequest(isAutoCommit *bool, namespaceName *string) {
+func (c *prismClient) handleConnectionPropertiesUpdateRequest(isAutoCommit *bool, namespaceName *string) error {
 	request := prism.Request{
 		Type: &prism.Request_ConnectionPropertiesUpdateRequest{
 			ConnectionPropertiesUpdateRequest: &prism.ConnectionPropertiesUpdateRequest{
@@ -227,31 +271,39 @@ func (c *prismClient) handleConnectionPropertiesUpdateRequest(isAutoCommit *bool
 			},
 		},
 	}
-	c.helperSendAndRecv(&request)
+	_, err := c.helperSendAndRecv(&request)
+	return err
 }
 
-func (c *prismClient) handleConnectionCheckRequest() {
+func (c *prismClient) handleConnectionCheckRequest() error {
 	request := prism.Request{
 		Type: &prism.Request_ConnectionCheckRequest{
 			ConnectionCheckRequest: &prism.ConnectionCheckRequest{},
 		},
 	}
-	c.helperSendAndRecv(&request)
+	_, err := c.helperSendAndRecv(&request)
+	return err
 }
 
-func (c *prismClient) handleDisconnectRequest() {
+func (c *prismClient) handleDisconnectRequest() error {
 	request := prism.Request{
 		Type: &prism.Request_DisconnectRequest{
 			DisconnectRequest: &prism.DisconnectRequest{},
 		},
 	}
-	c.send(c.serialize(&request))
-	c.recv()
+	_, err := c.helperSendAndRecv(&request)
+	if err != nil {
+		return err
+	}
 	c.isConnected = statusServerConnected
-	c.close()
+	err = c.close()
+	if err != nil {
+		return err
+	}
+	return err
 }
 
-func (c *prismClient) handleCloseStatementRequest(statementId int32) {
+func (c *prismClient) handleCloseStatementRequest(statementId int32) error {
 	request := prism.Request{
 		Type: &prism.Request_CloseStatementRequest{
 			CloseStatementRequest: &prism.CloseStatementRequest{
@@ -259,32 +311,34 @@ func (c *prismClient) handleCloseStatementRequest(statementId int32) {
 			},
 		},
 	}
-	c.send(c.serialize(&request))
-	c.recv()
+	_, err := c.helperSendAndRecv(&request)
+	return err
 }
 
-func convertProtoValue(raw *prism.ProtoValue) interface{} {
+func convertProtoValue(raw *prism.ProtoValue) (interface{}, error) {
 	if raw.GetBoolean() != nil {
-		return raw.GetBoolean().GetBoolean()
+		return raw.GetBoolean().GetBoolean(), nil
 	} else if raw.GetInteger() != nil {
-		return raw.GetInteger().GetInteger()
+		return raw.GetInteger().GetInteger(), nil
 	} else if raw.GetLong() != nil {
-		return raw.GetLong().GetLong()
+		return raw.GetLong().GetLong(), nil
 	} else if raw.GetBigDecimal() != nil {
 		// TODO: add support to big decimals
-		return nil
+		return nil, nil
 	} else if raw.GetFloat() != nil {
-		return raw.GetFloat().GetFloat()
+		return raw.GetFloat().GetFloat(), nil
 	} else if raw.GetDouble() != nil {
-		return raw.GetDouble().GetDouble()
+		return raw.GetDouble().GetDouble(), nil
 	} else if raw.GetString_() != nil {
-		return raw.GetString_().GetString_()
+		return raw.GetString_().GetString_(), nil
 	} else {
-		return nil
+		return nil, &ClientError{
+			message: "Failed to convert ProtoValue. This is likely a bug.",
+		}
 	}
 }
 
-func makeProtoValue(value interface{}) *prism.ProtoValue {
+func makeProtoValue(value interface{}) (*prism.ProtoValue, error) {
 	var result prism.ProtoValue
 	switch value.(type) {
 	case bool:
@@ -336,9 +390,11 @@ func makeProtoValue(value interface{}) *prism.ProtoValue {
 			},
 		}
 	default:
-		log.Fatalf("Lack of support to %T %v", value, value)
+		return nil, &ClientError{
+			message: fmt.Sprintf("Lack of support to %T %v", value, value),
+		}
 	}
-	return &result
+	return &result, nil
 }
 
 func canConvertDocumentToRelational(documents []*prism.ProtoDocument) (bool, []string) {
@@ -348,7 +404,7 @@ func canConvertDocumentToRelational(documents []*prism.ProtoDocument) (bool, []s
 		if isFirst {
 			isFirst = false
 			for i, kvpair := range document.GetEntries() {
-				key := convertProtoValue(kvpair.GetKey())
+				key, _ := convertProtoValue(kvpair.GetKey())
 				switch key.(type) {
 				case string:
 					keys[i] = key.(string)
@@ -361,7 +417,7 @@ func canConvertDocumentToRelational(documents []*prism.ProtoDocument) (bool, []s
 				return false, nil
 			}
 			for i, kvpair := range document.GetEntries() {
-				key := convertProtoValue(kvpair.GetKey())
+				key, _ := convertProtoValue(kvpair.GetKey())
 				switch key.(type) {
 				case string:
 					if key.(string) != keys[i] {
@@ -376,7 +432,7 @@ func canConvertDocumentToRelational(documents []*prism.ProtoDocument) (bool, []s
 	return true, keys
 }
 
-func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query UnparameterizedStatementRequest) (int64, []string, [][]interface{}) {
+func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query UnparameterizedStatementRequest) (int64, []string, [][]interface{}, error) {
 	request := prism.Request{
 		Type: &prism.Request_ExecuteUnparameterizedStatementRequest{
 			ExecuteUnparameterizedStatementRequest: &prism.ExecuteUnparameterizedStatementRequest{
@@ -387,22 +443,28 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query Unparam
 			},
 		},
 	}
-	c.send(c.serialize(&request))
-	buf := c.recv()
-	var response prism.Response
-	proto.Unmarshal(buf, &response)
+	response, err := c.helperSendAndRecv(&request)
+	if err != nil {
+		return -1, nil, nil, err
+	}
 	requestID := response.GetStatementResponse().GetStatementId()
-	buf = c.recv() // this is the query result
-	proto.Unmarshal(buf, &response)
+	buf, err := c.recv() // this is the query result
+	if err != nil {
+		return -1, nil, nil, err
+	}
+	err = proto.Unmarshal(buf, response)
+	if err != nil {
+		return -1, nil, nil, err
+	}
 	if requestID != response.GetStatementResponse().GetStatementId() {
-		return 0, nil, nil
+		return 0, nil, nil, nil
 	}
 	if response.GetStatementResponse().GetResult() == nil {
-		return 0, nil, nil
+		return 0, nil, nil, nil
 	}
 	affectedRows := response.GetStatementResponse().GetResult().GetScalar()
 	if response.GetStatementResponse().GetResult().GetFrame() == nil {
-		return affectedRows, nil, nil
+		return affectedRows, nil, nil, nil
 	}
 
 	frame := response.GetStatementResponse().GetResult().GetFrame()
@@ -420,11 +482,15 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query Unparam
 		for _, irow := range rows {
 			currentRow = []interface{}{}
 			for _, ivalue := range irow.GetValues() {
-				currentRow = append(currentRow, convertProtoValue(ivalue))
+				converted, err := convertProtoValue(ivalue)
+				if err != nil {
+					return -1, nil, nil, err
+				}
+				currentRow = append(currentRow, converted)
 			}
 			values = append(values, currentRow)
 		}
-		return affectedRows, columns, values
+		return affectedRows, columns, values, nil
 	} else if frame.GetDocumentFrame() != nil {
 		documentData := frame.GetDocumentFrame().GetDocuments()
 		canConvert, columns := canConvertDocumentToRelational(documentData)
@@ -438,19 +504,29 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query Unparam
 			for _, document := range documentData {
 				currentRow = make([]interface{}, len(columns))
 				for i, kvpair := range document.GetEntries() {
-					currentRow[i] = convertProtoValue(kvpair.GetValue())
+					converted, err := convertProtoValue(kvpair.GetValue())
+					if err != nil {
+						return -1, nil, nil, err
+					}
+					currentRow[i] = converted
 				}
 				values = append(values, currentRow)
 			}
-			return affectedRows, columns, values
+			return affectedRows, columns, values, nil
 		}
 		// if we can't transform
 		// TODO: need a better way to return the result
 		for _, entries := range documentData {
 			//currentDocument = []interface{}{}
 			for _, v := range entries.GetEntries() {
-				kv.key = convertProtoValue(v.GetKey())
-				kv.value = convertProtoValue(v.GetValue())
+				kv.key, err = convertProtoValue(v.GetKey())
+				if err != nil {
+					return -1, nil, nil, err
+				}
+				kv.value, err = convertProtoValue(v.GetValue())
+				if err != nil {
+					return -1, nil, nil, err
+				}
 				//currentDocument = append(currentDocument, kv)
 				currentRow := make([]interface{}, 2)
 				currentRow[0] = kv.key
@@ -461,10 +537,12 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query Unparam
 		columns = make([]string, 2)
 		columns[0] = "key"
 		columns[1] = "value"
-		return affectedRows, columns, values
+		return affectedRows, columns, values, nil
 	} else {
 		// graph is currently not supported
-		return 0, nil, nil
+		return 0, nil, nil, &ClientError{
+			message: "Graph queries are currently not supported by Prism interface",
+		}
 	}
 
 }
@@ -472,7 +550,7 @@ func (c *prismClient) handleExecuteUnparameterizedStatementRequest(query Unparam
 func (c *prismClient) handleExecuteUnparameterizedStatementBatchRequest(queries []UnparameterizedStatementRequest) [][][]interface{} {
 	var result [][][]interface{}
 	for _, query := range queries {
-		_, _, response := c.handleExecuteUnparameterizedStatementRequest(query)
+		_, _, response, _ := c.handleExecuteUnparameterizedStatementRequest(query)
 		result = append(result, response)
 	}
 	return result
@@ -488,7 +566,7 @@ func (c *prismClient) handlePrepareIndexedStatementRequest(language string, stat
 			},
 		},
 	}
-	response := c.helperSendAndRecv(&request)
+	response, _ := c.helperSendAndRecv(&request)
 	result := make(map[int32][]ParameterMetaResponse)
 	var parameterMetas []ParameterMetaResponse
 	for _, parameter := range response.GetPreparedStatementSignature().GetParameterMetas() {
@@ -514,7 +592,7 @@ func (c *prismClient) handlePrepareNamedStatementRequest(language string, statem
 			},
 		},
 	}
-	response := c.helperSendAndRecv(&request)
+	response, _ := c.helperSendAndRecv(&request)
 	result := make(map[int32][]ParameterMetaResponse)
 	var parameterMetas []ParameterMetaResponse
 	for _, parameter := range response.GetPreparedStatementSignature().GetParameterMetas() {
@@ -533,7 +611,7 @@ func (c *prismClient) handlePrepareNamedStatementRequest(language string, statem
 func (c *prismClient) handleExecuteIndexedStatementRequest(statementId int32, parameters IndexedParametersRequest, fetchSize *int32) [][]interface{} {
 	polyvalues := make([]*prism.ProtoValue, len(parameters.parameters))
 	for i, v := range parameters.parameters {
-		polyvalues[i] = makeProtoValue(v)
+		polyvalues[i], _ = makeProtoValue(v)
 	}
 	request := prism.Request{
 		Type: &prism.Request_ExecuteIndexedStatementRequest{
@@ -546,7 +624,7 @@ func (c *prismClient) handleExecuteIndexedStatementRequest(statementId int32, pa
 			},
 		},
 	}
-	response := c.helperSendAndRecv(&request)
+	response, _ := c.helperSendAndRecv(&request)
 	if response.GetStatementResult() == nil {
 		return nil
 	}
@@ -564,7 +642,8 @@ func (c *prismClient) handleExecuteIndexedStatementRequest(statementId int32, pa
 		for _, irow := range rows {
 			currentRow = []interface{}{}
 			for _, ivalue := range irow.GetValues() {
-				currentRow = append(currentRow, convertProtoValue(ivalue))
+				converted, _ := convertProtoValue(ivalue)
+				currentRow = append(currentRow, converted)
 			}
 			values = append(values, currentRow)
 		}
@@ -576,8 +655,8 @@ func (c *prismClient) handleExecuteIndexedStatementRequest(statementId int32, pa
 		for _, entries := range documentData {
 			currentDocument = []interface{}{}
 			for _, v := range entries.GetEntries() {
-				kv.key = convertProtoValue(v.GetKey())
-				kv.value = convertProtoValue(v.GetValue())
+				kv.key, _ = convertProtoValue(v.GetKey())
+				kv.value, _ = convertProtoValue(v.GetValue())
 				currentDocument = append(currentDocument, kv)
 			}
 			values = append(values, currentDocument)
@@ -600,7 +679,7 @@ func (c *prismClient) handleExecuteIndexedStatementBatchRequest(statementId int3
 func (c *prismClient) handleExecuteNamedStatementRequest(statementId int32, parameters map[string]interface{}, fetchSize *int32) [][]interface{} {
 	polyvalues := make(map[string]*prism.ProtoValue)
 	for k, v := range parameters {
-		polyvalues[k] = makeProtoValue(v)
+		polyvalues[k], _ = makeProtoValue(v)
 	}
 	request := prism.Request{
 		Type: &prism.Request_ExecuteNamedStatementRequest{
@@ -613,7 +692,7 @@ func (c *prismClient) handleExecuteNamedStatementRequest(statementId int32, para
 			},
 		},
 	}
-	response := c.helperSendAndRecv(&request)
+	response, _ := c.helperSendAndRecv(&request)
 	if response.GetStatementResult() == nil {
 		return nil
 	}
@@ -631,7 +710,8 @@ func (c *prismClient) handleExecuteNamedStatementRequest(statementId int32, para
 		for _, irow := range rows {
 			currentRow = []interface{}{}
 			for _, ivalue := range irow.GetValues() {
-				currentRow = append(currentRow, convertProtoValue(ivalue))
+				converted, _ := convertProtoValue(ivalue)
+				currentRow = append(currentRow, converted)
 			}
 			values = append(values, currentRow)
 		}
@@ -643,8 +723,8 @@ func (c *prismClient) handleExecuteNamedStatementRequest(statementId int32, para
 		for _, entries := range documentData {
 			currentDocument = []interface{}{}
 			for _, v := range entries.GetEntries() {
-				kv.key = convertProtoValue(v.GetKey())
-				kv.value = convertProtoValue(v.GetValue())
+				kv.key, _ = convertProtoValue(v.GetKey())
+				kv.value, _ = convertProtoValue(v.GetValue())
 				currentDocument = append(currentDocument, kv)
 			}
 			values = append(values, currentDocument)
@@ -664,10 +744,7 @@ func (c *prismClient) handleFetchRequest(statementId int32) [][]interface{} {
 			},
 		},
 	}
-	c.send(c.serialize(&request))
-	buf := c.recv()
-	var response prism.Response
-	proto.Unmarshal(buf, &response)
+	response, _ := c.helperSendAndRecv(&request)
 	if response.GetStatementResponse().GetResult() == nil {
 		return nil
 	}
@@ -684,7 +761,8 @@ func (c *prismClient) handleFetchRequest(statementId int32) [][]interface{} {
 		for _, irow := range rows {
 			currentRow = []interface{}{}
 			for _, ivalue := range irow.GetValues() {
-				currentRow = append(currentRow, convertProtoValue(ivalue))
+				converted, _ := convertProtoValue(ivalue)
+				currentRow = append(currentRow, converted)
 			}
 			values = append(values, currentRow)
 		}
@@ -696,8 +774,8 @@ func (c *prismClient) handleFetchRequest(statementId int32) [][]interface{} {
 		for _, entries := range documentData {
 			currentDocument = []interface{}{}
 			for _, v := range entries.GetEntries() {
-				kv.key = convertProtoValue(v.GetKey())
-				kv.value = convertProtoValue(v.GetValue())
+				kv.key, _ = convertProtoValue(v.GetKey())
+				kv.value, _ = convertProtoValue(v.GetValue())
 				currentDocument = append(currentDocument, kv)
 			}
 			values = append(values, currentDocument)
@@ -709,24 +787,24 @@ func (c *prismClient) handleFetchRequest(statementId int32) [][]interface{} {
 	}
 }
 
-func (c *prismClient) handleCommitRequest() {
+func (c *prismClient) handleCommitRequest() error {
 	request := prism.Request{
 		Type: &prism.Request_CommitRequest{
 			CommitRequest: &prism.CommitRequest{},
 		},
 	}
-	c.send(c.serialize(&request))
-	c.recv()
+	_, err := c.helperSendAndRecv(&request)
+	return err
 }
 
-func (c *prismClient) handleRollbackRequest() {
+func (c *prismClient) handleRollbackRequest() error {
 	request := prism.Request{
 		Type: &prism.Request_RollbackRequest{
 			RollbackRequest: &prism.RollbackRequest{},
 		},
 	}
-	c.send(c.serialize(&request))
-	c.recv()
+	_, err := c.helperSendAndRecv(&request)
+	return err
 }
 
 func (c *prismClient) handleDbmsVersionRequest() PolyphenyVersionResponse {
@@ -735,7 +813,7 @@ func (c *prismClient) handleDbmsVersionRequest() PolyphenyVersionResponse {
 			DbmsVersionRequest: &prism.DbmsVersionRequest{},
 		},
 	}
-	response := c.helperSendAndRecv(&request)
+	response, _ := c.helperSendAndRecv(&request)
 	result := PolyphenyVersionResponse{
 		dbmsName:     response.GetDbmsVersionResponse().GetDbmsName(),
 		versionName:  response.GetDbmsVersionResponse().GetVersionName(),
@@ -751,7 +829,7 @@ func (c *prismClient) handleDefaultNamespaceRequest() string {
 			DefaultNamespaceRequest: &prism.DefaultNamespaceRequest{},
 		},
 	}
-	response := c.helperSendAndRecv(&request)
+	response, _ := c.helperSendAndRecv(&request)
 	return response.GetDefaultNamespaceResponse().GetDefaultNamespace()
 }
 
@@ -761,7 +839,7 @@ func (c *prismClient) handleTableTypeRequest() []string {
 			TableTypesRequest: &prism.TableTypesRequest{},
 		},
 	}
-	response := c.helperSendAndRecv(&request)
+	response, _ := c.helperSendAndRecv(&request)
 	var result []string
 	for _, typeName := range response.GetTableTypesResponse().GetTableTypes() {
 		result = append(result, typeName.GetTableType())
@@ -775,7 +853,7 @@ func (c *prismClient) handleTypesRequest() []TypeResponse {
 			TypesRequest: &prism.TypesRequest{},
 		},
 	}
-	response := c.helperSendAndRecv(&request)
+	response, _ := c.helperSendAndRecv(&request)
 	var result []TypeResponse
 	for _, t := range response.GetTypesResponse().GetTypes() {
 		result = append(result, TypeResponse{
@@ -800,7 +878,7 @@ func (c *prismClient) handleSqlStringFunctionsRequest() string {
 			SqlStringFunctionsRequest: &prism.SqlStringFunctionsRequest{},
 		},
 	}
-	response := c.helperSendAndRecv(&request)
+	response, _ := c.helperSendAndRecv(&request)
 	return response.GetSqlStringFunctionsResponse().GetString_()
 }
 
@@ -810,7 +888,7 @@ func (c *prismClient) handleSqlSystemFunctionsRequest() string {
 			SqlSystemFunctionsRequest: &prism.SqlSystemFunctionsRequest{},
 		},
 	}
-	response := c.helperSendAndRecv(&request)
+	response, _ := c.helperSendAndRecv(&request)
 	return response.GetSqlSystemFunctionsResponse().GetString_()
 }
 
@@ -820,7 +898,7 @@ func (c *prismClient) handleSqlTimeDateFunctionsRequest() string {
 			SqlTimeDateFunctionsRequest: &prism.SqlTimeDateFunctionsRequest{},
 		},
 	}
-	response := c.helperSendAndRecv(&request)
+	response, _ := c.helperSendAndRecv(&request)
 	return response.GetSqlTimeDateFunctionsResponse().GetString_()
 }
 
@@ -830,7 +908,7 @@ func (c *prismClient) handleSqlNumericFunctionsRequest() string {
 			SqlNumericFunctionsRequest: &prism.SqlNumericFunctionsRequest{},
 		},
 	}
-	response := c.helperSendAndRecv(&request)
+	response, _ := c.helperSendAndRecv(&request)
 	return response.GetSqlNumericFunctionsResponse().GetString_()
 }
 
@@ -840,7 +918,7 @@ func (c *prismClient) handleSqlKeywordsRequest() string {
 			SqlKeywordsRequest: &prism.SqlKeywordsRequest{},
 		},
 	}
-	response := c.helperSendAndRecv(&request)
+	response, _ := c.helperSendAndRecv(&request)
 	return response.GetSqlKeywordsResponse().GetString_()
 }
 
@@ -853,7 +931,7 @@ func (c *prismClient) handleProceduresRequest(language string, procedureNamePatt
 			},
 		},
 	}
-	response := c.helperSendAndRecv(&request)
+	response, _ := c.helperSendAndRecv(&request)
 	var result []ProceduresResponse
 	for _, procedure := range response.GetProceduresResponse().GetProcedures() {
 		result = append(result, ProceduresResponse{
@@ -873,7 +951,7 @@ func (c *prismClient) handleClientInfoPropertiesRequest() map[string]string {
 			ClientInfoPropertiesRequest: &prism.ClientInfoPropertiesRequest{},
 		},
 	}
-	response := c.helperSendAndRecv(&request)
+	response, _ := c.helperSendAndRecv(&request)
 	return response.GetClientInfoPropertiesResponse().GetProperties()
 }
 
@@ -886,7 +964,7 @@ func (c *prismClient) handleFunctionsRequest(language string, category string) [
 			},
 		},
 	}
-	response := c.helperSendAndRecv(&request)
+	response, _ := c.helperSendAndRecv(&request)
 	var result []FunctionsResponse
 	for _, f := range response.GetFunctionsResponse().GetFunctions() {
 		result = append(result, FunctionsResponse{
@@ -908,7 +986,7 @@ func (c *prismClient) handleNamespacesResponse(namespacePattern *string, namespa
 			},
 		},
 	}
-	response := c.helperSendAndRecv(&request)
+	response, _ := c.helperSendAndRecv(&request)
 	var result []NamespaceResponse
 	for _, entry := range response.GetNamespacesResponse().GetNamespaces() {
 		result = append(result, NamespaceResponse{

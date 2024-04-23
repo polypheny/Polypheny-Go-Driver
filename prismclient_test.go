@@ -7,7 +7,7 @@ import (
 )
 
 func TestNewConnection(t *testing.T) {
-	conn := newConnection("localhost:20590", "pa")
+	conn, _ := newConnection("localhost:20590", "pa")
 	defer conn.conn.Close()
 	if conn.isConnected != statusServerConnected {
 		t.Fatalf("Failed to make a connection. The current status is %v", conn.isConnected)
@@ -15,7 +15,7 @@ func TestNewConnection(t *testing.T) {
 }
 
 func TestSerialize(t *testing.T) {
-	conn := newConnection("localhost:20590", "pa")
+	conn, _ := newConnection("localhost:20590", "pa")
 	username := "pa"
 	password := ""
 	request := prism.Request{
@@ -28,7 +28,7 @@ func TestSerialize(t *testing.T) {
 			},
 		},
 	}
-	result := conn.serialize(&request)
+	result, _ := conn.serialize(&request)
 	expected := []byte{154, 1, 8, 8, 2, 42, 2, 112, 97, 50, 0}
 	if !bytes.Equal(result, expected) {
 		t.Fatalf("Error when serializing a request got %v,but expected %v", result, expected)
@@ -36,7 +36,7 @@ func TestSerialize(t *testing.T) {
 }
 
 func TestSend(t *testing.T) {
-	conn := newConnection("localhost:20590", "pa")
+	conn, _ := newConnection("localhost:20590", "pa")
 	username := "pa"
 	password := ""
 	request := prism.Request{
@@ -49,12 +49,13 @@ func TestSend(t *testing.T) {
 			},
 		},
 	}
-	conn.send(conn.serialize(&request))
+	serialized, _ := conn.serialize(&request)
+	conn.send(serialized)
 	conn.recv()
 }
 
 func TestRecv(t *testing.T) {
-	conn := newConnection("localhost:20590", "pa")
+	conn, _ := newConnection("localhost:20590", "pa")
 	username := "pa"
 	password := ""
 	request := prism.Request{
@@ -67,8 +68,9 @@ func TestRecv(t *testing.T) {
 			},
 		},
 	}
-	conn.send(conn.serialize(&request))
-	result := conn.recv()
+	serialized, _ := conn.serialize(&request)
+	conn.send(serialized)
+	result, _ := conn.recv()
 	expected := []byte{16, 1, 98, 4, 8, 1, 16, 2}
 	if !bytes.Equal(result, expected) {
 		t.Fatalf("Error when receiving a response got %v,but expected %v", result, expected)
@@ -76,7 +78,7 @@ func TestRecv(t *testing.T) {
 }
 
 func TestClose(t *testing.T) {
-	conn := newConnection("localhost:20590", "pa")
+	conn, _ := newConnection("localhost:20590", "pa")
 	conn.close()
 	if conn.isConnected != statusDisconnected {
 		t.Fatalf("Failed to disconnect, the current client status is %v", conn.isConnected)
@@ -84,7 +86,7 @@ func TestClose(t *testing.T) {
 }
 
 func TestHelperSendAndRecv(t *testing.T) {
-	conn := newConnection("localhost:20590", "pa")
+	conn, _ := newConnection("localhost:20590", "pa")
 	username := "pa"
 	password := ""
 	request := prism.Request{
@@ -97,7 +99,7 @@ func TestHelperSendAndRecv(t *testing.T) {
 			},
 		},
 	}
-	response := conn.helperSendAndRecv(&request)
+	response, _ := conn.helperSendAndRecv(&request)
 	if response.GetConnectionResponse().GetIsCompatible() != true {
 		t.Fatalf("The connection response is not correct")
 	}
@@ -107,7 +109,7 @@ func TestHandleConnectRequest(t *testing.T) {
 	address := "localhost:20590"
 	username := "pa"
 	password := ""
-	client := handleConnectRequest(address, username, password)
+	client, _ := handleConnectRequest(address, username, password)
 	if client.isConnected != statusPolyphenyConnected {
 		t.Fatalf("Failed to connect to Polypheny, the current client status is %v", client.isConnected)
 	}
@@ -117,7 +119,7 @@ func TestHandleConnectionPropertiesUpdateRequest(t *testing.T) {
 	address := "localhost:20590"
 	username := "pa"
 	password := ""
-	client := handleConnectRequest(address, username, password)
+	client, _ := handleConnectRequest(address, username, password)
 	isAutoCommit := true
 	client.handleConnectionPropertiesUpdateRequest(&isAutoCommit, nil)
 }
@@ -126,7 +128,7 @@ func TestHandleConnectionCheckRequest(t *testing.T) {
 	address := "localhost:20590"
 	username := "pa"
 	password := ""
-	client := handleConnectRequest(address, username, password)
+	client, _ := handleConnectRequest(address, username, password)
 	client.handleConnectionCheckRequest()
 }
 
@@ -134,7 +136,7 @@ func TestHandleDisconnectRequest(t *testing.T) {
 	address := "localhost:20590"
 	username := "pa"
 	password := ""
-	client := handleConnectRequest(address, username, password)
+	client, _ := handleConnectRequest(address, username, password)
 	client.handleDisconnectRequest()
 	if client.isConnected != statusDisconnected {
 		t.Fatalf("Failed to disconnect, the current client status is %v", client.isConnected)
@@ -145,22 +147,22 @@ func TestMakeProtoValue1(t *testing.T) {
 	var result *prism.ProtoValue
 	var value interface{}
 	value = true
-	result = makeProtoValue(value)
+	result, _ = makeProtoValue(value)
 	if result.GetBoolean().GetBoolean() != true {
 		t.Fatalf("Error in making a ProtoValue, expected %v, got %v", value, result.GetBoolean().GetBoolean())
 	}
 	value = int32(1)
-	result = makeProtoValue(value)
+	result, _ = makeProtoValue(value)
 	if result.GetInteger().GetInteger() != value.(int32) {
 		t.Fatalf("Error in making a ProtoValue, expected %v, got %v", value, result.GetInteger().GetInteger())
 	}
 	value = int64(100000000000)
-	result = makeProtoValue(value)
+	result, _ = makeProtoValue(value)
 	if result.GetLong().GetLong() != value.(int64) {
 		t.Fatalf("Error in making a ProtoValue, expected %v, got %v", value, result.GetLong().GetLong())
 	}
 	value = "Hello, world!"
-	result = makeProtoValue(value)
+	result, _ = makeProtoValue(value)
 	if result.GetString_().GetString_() != value.(string) {
 		t.Fatalf("Error in making a ProtoValue, expected %v, got %v", value, result.GetString_().GetString_())
 	}
@@ -170,8 +172,8 @@ func TestConvertProtoValue(t *testing.T) {
 	var protoValue *prism.ProtoValue
 	var result interface{}
 	var expected interface{} = true
-	protoValue = makeProtoValue(expected)
-	result = convertProtoValue(protoValue)
+	protoValue, _ = makeProtoValue(expected)
+	result, _ = convertProtoValue(protoValue)
 	if result.(bool) != expected {
 		t.Fatalf("Failed to convert, expected %v, but got %v", expected, result)
 	}
@@ -181,7 +183,7 @@ func TestHandleExecuteUnparameterizedStatementRequestSql(t *testing.T) {
 	address := "localhost:20590"
 	username := "pa"
 	password := ""
-	client := handleConnectRequest(address, username, password)
+	client, _ := handleConnectRequest(address, username, password)
 	query := UnparameterizedStatementRequest{
 		language:      "sql",
 		statement:     "drop table if exists mytable",
@@ -217,7 +219,7 @@ func TestHandleExecuteUnparameterizedStatementRequestSql(t *testing.T) {
 		namespaceName: nil,
 	}
 	client.handleCommitRequest()
-	affectedRows, columns, result := client.handleExecuteUnparameterizedStatementRequest(query)
+	affectedRows, columns, result, _ := client.handleExecuteUnparameterizedStatementRequest(query)
 	t.Log(affectedRows)
 	t.Log(columns)
 	t.Log(result)
@@ -227,7 +229,7 @@ func TestHandleExecuteUnparameterizedStatementRequestMongo(t *testing.T) {
 	address := "localhost:20590"
 	username := "pa"
 	password := ""
-	client := handleConnectRequest(address, username, password)
+	client, _ := handleConnectRequest(address, username, password)
 	query := UnparameterizedStatementRequest{
 		language:      "sql",
 		statement:     "drop table if exists mytable",
@@ -263,7 +265,7 @@ func TestHandleExecuteUnparameterizedStatementRequestMongo(t *testing.T) {
 		fetchSize:     nil,
 		namespaceName: nil,
 	}
-	affectedRows, columns, result := client.handleExecuteUnparameterizedStatementRequest(query)
+	affectedRows, columns, result, _ := client.handleExecuteUnparameterizedStatementRequest(query)
 	t.Log(affectedRows)
 	t.Log(columns)
 	t.Log(result)

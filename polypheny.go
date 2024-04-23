@@ -137,7 +137,10 @@ func (c *Conn) ExecContext(ctx context.Context, query string, args []driver.Name
 		fetchSize:     nil,
 		namespaceName: nil,
 	}
-	affectedRows, _, _ := c.conn.handleExecuteUnparameterizedStatementRequest(request)
+	affectedRows, _, _, err := c.conn.handleExecuteUnparameterizedStatementRequest(request)
+	if err != nil {
+		return nil, err
+	}
 	result := ExecResult{
 		lastInsertId: 0,
 		affectedRows: affectedRows,
@@ -153,7 +156,10 @@ func (c *Conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 		fetchSize:     nil,
 		namespaceName: nil,
 	}
-	_, columns, result := c.conn.handleExecuteUnparameterizedStatementRequest(request)
+	_, columns, result, err := c.conn.handleExecuteUnparameterizedStatementRequest(request)
+	if err != nil {
+		return nil, err
+	}
 	rows := Rows{
 		columns:   columns,
 		result:    result,
@@ -171,7 +177,10 @@ func (c *Connector) Driver() driver.Driver {
 }
 
 func (c *Connector) Connect(context.Context) (driver.Conn, error) {
-	client := handleConnectRequest(c.address, c.username, c.password)
+	client, err := handleConnectRequest(c.address, c.username, c.password)
+	if err != nil {
+		return nil, err
+	}
 	conn := Conn{
 		conn: *client,
 	}
