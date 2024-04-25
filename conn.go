@@ -1,7 +1,6 @@
 package polypheny
 
 import (
-	context "context"
 	"database/sql/driver"
 	binary "encoding/binary"
 	math "math"
@@ -125,41 +124,6 @@ func (conn *PolyphenyConn) Exec(query string, args []driver.Value) (driver.Resul
 // TODO: for args support, can we first prepare it and then exec?
 // Deprecated
 func (conn *PolyphenyConn) Query(query string, args []driver.Value) (driver.Rows, error) {
-	queryLanguage, queryBody, err := parseQuery(query)
-	if err != nil {
-		return nil, err
-	}
-	request := prism.Request{
-		Type: &prism.Request_ExecuteUnparameterizedStatementRequest{
-			ExecuteUnparameterizedStatementRequest: &prism.ExecuteUnparameterizedStatementRequest{
-				LanguageName:  queryLanguage,
-				Statement:     queryBody,
-				FetchSize:     nil,
-				NamespaceName: nil,
-			},
-		},
-	}
-	response, err := conn.helperSendAndRecv(&request)
-	if err != nil {
-		return nil, err
-	}
-	requestID := response.GetStatementResponse().GetStatementId()
-	buf, err := conn.recv(8) // this is the query result
-	if err != nil {
-		return nil, err
-	}
-	err = proto.Unmarshal(buf, response)
-	if err != nil {
-		return nil, err
-	}
-	// is this an error?
-	if requestID != response.GetStatementResponse().GetStatementId() {
-		return nil, nil
-	}
-	return helperExtractRowsFromStatementResult(response.GetStatementResponse().GetResult())
-}
-
-func (conn *PolyphenyConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	queryLanguage, queryBody, err := parseQuery(query)
 	if err != nil {
 		return nil, err
