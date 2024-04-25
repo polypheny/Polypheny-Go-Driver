@@ -37,39 +37,50 @@ func TestSQLFlow(t *testing.T) {
 	}
 }
 
-// func TestMongoFlow(t *testing.T) {
-// 	db, _ := sql.Open("polypheny", "localhost:20590,pa:")
-// 	rows, _ := db.Query("mongo:db.emps.find()")
-// 	t.Log(rows.Columns())
-// 	for rows.Next() {
-// 		mongo := new(mongo)
-// 		rows.Scan(&mongo.name, &mongo.deptno, &mongo.salary, &mongo.empid, &mongo.commission)
-// 		t.Log(mongo)
-// 	}
-// }
+func TestMongoFlow(t *testing.T) {
+	db, _ := sql.Open("polypheny", "localhost:20590,pa:")
+	rows, _ := db.Query("mongo:db.emps.find()")
+	t.Log(rows.Columns())
+	for rows.Next() {
+		mongo := new(mongo)
+		rows.Scan(&mongo.name, &mongo.deptno, &mongo.salary, &mongo.empid, &mongo.commission)
+		t.Log(mongo)
+	}
+}
 
-// type mytable struct {
-// 	id  int32
-// 	yac string
-// }
+type mytable struct {
+	id  int32
+	yac string
+}
 
-// func TestExecFlow(t *testing.T) {
-// 	db, _ := sql.Open("polypheny", "localhost:20590,pa:")
-// 	result, _ := db.Exec("sql:drop table if exists mytable")
-// 	t.Log(result.RowsAffected())
-// 	result, _ = db.Exec("sql:create table mytable(id int not null, yac varchar(10), primary key(id))")
-// 	t.Log(result.RowsAffected())
-// 	result, _ = db.Exec("sql:insert into mytable values(1, 'hello')")
-// 	t.Log(result.RowsAffected())
-// 	result, _ = db.Exec("sql:insert into mytable values(2, 'world')")
-// 	t.Log(result.RowsAffected())
-// 	result, _ = db.Exec("sql:update mytable set yac = 'polypheny' where id in (select id from mytable where id = 1 or id = 2)")
-// 	t.Log(result.RowsAffected())
-// 	rows, _ := db.Query("sql:select * from mytable")
-// 	t.Log(rows.Columns())
-// 	for rows.Next() {
-// 		temp := new(mytable)
-// 		rows.Scan(&temp.id, &temp.yac)
-// 		t.Log(temp)
-// 	}
-// }
+func TestExecFlow(t *testing.T) {
+	db, _ := sql.Open("polypheny", "localhost:20590,pa:")
+	result, _ := db.Exec("sql:drop table if exists mytable")
+	t.Log(result.RowsAffected())
+	result, _ = db.Exec("sql:create table mytable(id int not null, yac varchar(10), primary key(id))")
+	t.Log(result.RowsAffected())
+	result, _ = db.Exec("sql:insert into mytable values(1, 'hello')")
+	t.Log(result.RowsAffected())
+	result, _ = db.Exec("sql:insert into mytable values(2, 'world')")
+	t.Log(result.RowsAffected())
+	result, _ = db.Exec("sql:update mytable set yac = 'polypheny' where id in (select id from mytable where id = 1 or id = 2)")
+	t.Log(result.RowsAffected())
+	stmt, err := db.Prepare("sql:select * from mytable where id = ?")
+	t.Log(err)
+	rows, err := stmt.Query(1)
+	t.Log(err)
+	//rows, _ := db.Query("sql:select * from mytable")
+	t.Log(rows.Columns())
+	for rows.Next() {
+		temp := new(mytable)
+		rows.Scan(&temp.id, &temp.yac)
+		t.Log(temp)
+	}
+	rows, _ = db.Query("sql:select * from mytable")
+	t.Log(rows.Columns())
+	for rows.Next() {
+		temp := new(mytable)
+		rows.Scan(&temp.id, &temp.yac)
+		t.Log(temp)
+	}
+}

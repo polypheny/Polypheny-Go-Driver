@@ -47,12 +47,12 @@ func convertProtoValue(raw *prism.ProtoValue) (any, error) {
 // makeProtoValue converts go value to ProtoValue
 func makeProtoValue(value any) (*prism.ProtoValue, error) {
 	var result prism.ProtoValue
-	switch value.(type) {
+	switch value := value.(type) {
 	case bool:
 		result = prism.ProtoValue{
 			Value: &prism.ProtoValue_Boolean{
 				Boolean: &prism.ProtoBoolean{
-					Boolean: value.(bool),
+					Boolean: value,
 				},
 			},
 		}
@@ -60,7 +60,7 @@ func makeProtoValue(value any) (*prism.ProtoValue, error) {
 		result = prism.ProtoValue{
 			Value: &prism.ProtoValue_Integer{
 				Integer: &prism.ProtoInteger{
-					Integer: value.(int32),
+					Integer: value,
 				},
 			},
 		}
@@ -68,7 +68,7 @@ func makeProtoValue(value any) (*prism.ProtoValue, error) {
 		result = prism.ProtoValue{
 			Value: &prism.ProtoValue_Long{
 				Long: &prism.ProtoLong{
-					Long: value.(int64),
+					Long: value,
 				},
 			},
 		}
@@ -76,7 +76,7 @@ func makeProtoValue(value any) (*prism.ProtoValue, error) {
 		result = prism.ProtoValue{
 			Value: &prism.ProtoValue_Double{
 				Double: &prism.ProtoDouble{
-					Double: value.(float64),
+					Double: value,
 				},
 			},
 		}
@@ -84,7 +84,7 @@ func makeProtoValue(value any) (*prism.ProtoValue, error) {
 		result = prism.ProtoValue{
 			Value: &prism.ProtoValue_Float{
 				Float: &prism.ProtoFloat{
-					Float: value.(float32),
+					Float: value,
 				},
 			},
 		}
@@ -92,7 +92,7 @@ func makeProtoValue(value any) (*prism.ProtoValue, error) {
 		result = prism.ProtoValue{
 			Value: &prism.ProtoValue_String_{
 				String_: &prism.ProtoString{
-					String_: value.(string),
+					String_: value,
 				},
 			},
 		}
@@ -125,9 +125,9 @@ func canConvertDocumentToRelational(documents []*prism.ProtoDocument) (bool, []s
 			isFirst = false
 			for i, kvpair := range document.GetEntries() {
 				key, _ := convertProtoValue(kvpair.GetKey())
-				switch key.(type) {
+				switch key := key.(type) {
 				case string:
-					keys[i] = key.(string)
+					keys[i] = key
 				default:
 					return false, nil
 				}
@@ -138,9 +138,9 @@ func canConvertDocumentToRelational(documents []*prism.ProtoDocument) (bool, []s
 			}
 			for i, kvpair := range document.GetEntries() {
 				key, _ := convertProtoValue(kvpair.GetKey())
-				switch key.(type) {
+				switch key := key.(type) {
 				case string:
-					if key.(string) != keys[i] {
+					if key != keys[i] {
 						return false, nil
 					}
 				default:
