@@ -22,15 +22,27 @@ type PolyphenyConn struct {
 }
 
 // Ping a connection
-// TODO: shall we add context cancel and timeout support?
+// TODO: shall we add context cancel and timeout support to Ping too?
 func (conn *PolyphenyConn) Ping(ctx context.Context) error {
+	status := conn.isConnected.Load()
+	if status == statusDisconnected {
+		return driver.ErrBadConn
+	} else if status == statusServerConnected {
+		return &ClientError{
+			message: "Ping: invalid connection to Polypheny server",
+		}
+	}
 	request := prism.Request{
 		Type: &prism.Request_ConnectionCheckRequest{
 			ConnectionCheckRequest: &prism.ConnectionCheckRequest{},
 		},
 	}
 	_, err := conn.helperSendAndRecv(&request)
-	return err
+	if err != nil {
+		// TODO: is there any other reasons causing the error?
+		return driver.ErrBadConn
+	}
+	return nil
 }
 
 // Prepare a statement

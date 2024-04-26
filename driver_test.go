@@ -1,6 +1,6 @@
 package polypheny
 
-// These flow tests will soon be removed
+// These flow tests will be removed when the context support is done.
 
 import (
 	//"context"
@@ -26,6 +26,8 @@ type mongo struct {
 
 func TestSQLFlow(t *testing.T) {
 	db, err := sql.Open("polypheny", "localhost:20590,pa:")
+	t.Log(err)
+	err = db.Ping()
 	t.Log(err)
 	rows, err := db.Query("sql:select * from emps")
 	t.Log(err)
