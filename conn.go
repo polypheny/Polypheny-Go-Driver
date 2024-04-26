@@ -1,10 +1,12 @@
 package polypheny
 
 import (
+	context "context"
 	"database/sql/driver"
 	binary "encoding/binary"
 	math "math"
 	net "net"
+	atomic "sync/atomic"
 
 	prism "github.com/polypheny/Polypheny-Go-Driver/protos"
 
@@ -13,10 +15,22 @@ import (
 
 // PolyphenyConn implements driver.Conn
 type PolyphenyConn struct {
-	address     string   // addr:port
-	username    string   // username is stored, but password is not
-	netConn     net.Conn // the Conn struct returned by Dial
-	isConnected int      // Connection status
+	address     string       // addr:port
+	username    string       // username is stored, but password is not
+	netConn     net.Conn     // the Conn struct returned by Dial
+	isConnected atomic.Int32 // Connection status
+}
+
+// Ping a connection
+// TODO: shall we add context cancel and timeout support?
+func (conn *PolyphenyConn) Ping(ctx context.Context) error {
+	request := prism.Request{
+		Type: &prism.Request_ConnectionCheckRequest{
+			ConnectionCheckRequest: &prism.ConnectionCheckRequest{},
+		},
+	}
+	_, err := conn.helperSendAndRecv(&request)
+	return err
 }
 
 // Prepare a statement
@@ -67,7 +81,7 @@ func (conn *PolyphenyConn) Close() error {
 	if err != nil {
 		return err
 	}
-	conn.isConnected = statusServerConnected
+	conn.isConnected.Store(statusServerConnected)
 	err = conn.close()
 	return err
 }
@@ -220,7 +234,7 @@ func (conn *PolyphenyConn) close() error {
 	if err != nil {
 		return err
 	}
-	conn.isConnected = statusDisconnected //TODO: maybe add an error status
+	conn.isConnected.Store(statusDisconnected) //TODO: maybe add an error status
 	return nil
 }
 

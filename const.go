@@ -9,9 +9,9 @@ const (
 
 // Connection Status
 const (
-	statusDisconnected       = 0
-	statusServerConnected    = 1
-	statusPolyphenyConnected = 2
+	statusDisconnected       = int32(0)
+	statusServerConnected    = int32(1)
+	statusPolyphenyConnected = int32(2)
 )
 
 // The delimiter between query language name and the actual query

@@ -3,8 +3,10 @@ package polypheny
 import (
 	bytes "bytes"
 	driver "database/sql/driver"
-	context "golang.org/x/net/context"
 	net "net"
+	"sync/atomic"
+
+	context "golang.org/x/net/context"
 
 	prism "github.com/polypheny/Polypheny-Go-Driver/protos"
 )
@@ -29,8 +31,9 @@ func (c *Connector) Connect(context.Context) (driver.Conn, error) {
 		address:     c.address,
 		username:    c.username,
 		netConn:     netConn,
-		isConnected: statusServerConnected,
+		isConnected: atomic.Int32{},
 	}
+	conn.isConnected.Store(statusServerConnected)
 	// Step 2, exchange transport version
 	recvVersion, err := conn.recv(1)
 	if err != nil {
@@ -61,7 +64,7 @@ func (c *Connector) Connect(context.Context) (driver.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn.isConnected = statusPolyphenyConnected
+	conn.isConnected.Store(statusPolyphenyConnected)
 	return &conn, nil
 }
 
