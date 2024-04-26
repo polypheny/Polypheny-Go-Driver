@@ -116,7 +116,7 @@ func (conn *PolyphenyConn) Exec(query string, args []driver.Value) (driver.Resul
 	if requestID != response.GetStatementResponse().GetStatementId() {
 		return nil, nil
 	}
-	return helperExtractResultFromStatementResult(response.GetStatementResult())
+	return helperExtractResultFromStatementResult(response.GetStatementResponse().GetResult())
 }
 
 // Exec executes a query that doesn't return data
