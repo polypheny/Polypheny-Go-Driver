@@ -4,8 +4,10 @@ package polypheny
 
 import (
 	//"context"
+	"context"
 	"database/sql"
 	testing "testing"
+	"time"
 )
 
 type emps struct {
@@ -37,6 +39,19 @@ func TestSQLFlow(t *testing.T) {
 		rows.Scan(&emp.empid, &emp.deptno, &emp.name, &emp.salary, &emp.commission)
 		t.Log(emp)
 	}
+}
+
+func TestPingContext(t *testing.T) {
+	db, err := sql.Open("polypheny", "localhost:20590,pa:")
+	t.Log(err)
+	err = db.Ping()
+	t.Log(err)
+	err = db.PingContext(context.Background())
+	t.Log(err)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Microsecond))
+	err = db.PingContext(ctx)
+	t.Log(err)
+	defer cancel()
 }
 
 func TestMongoFlow(t *testing.T) {

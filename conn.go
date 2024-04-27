@@ -21,14 +21,13 @@ type PolyphenyConn struct {
 	isConnected atomic.Int32 // Connection status
 }
 
-// Ping a connection
-// TODO: shall we add context cancel and timeout support to Ping too?
-func (conn *PolyphenyConn) Ping(ctx context.Context) error {
+// ping pings a connection and sending the result via the error channel
+func (conn *PolyphenyConn) pingInternal(err chan error) {
 	status := conn.isConnected.Load()
 	if status == statusDisconnected {
-		return driver.ErrBadConn
+		err <- driver.ErrBadConn
 	} else if status == statusServerConnected {
-		return &ClientError{
+		err <- &ClientError{
 			message: "Ping: invalid connection to Polypheny server",
 		}
 	}
@@ -37,12 +36,28 @@ func (conn *PolyphenyConn) Ping(ctx context.Context) error {
 			ConnectionCheckRequest: &prism.ConnectionCheckRequest{},
 		},
 	}
-	_, err := conn.helperSendAndRecv(&request)
-	if err != nil {
-		// TODO: is there any other reasons causing the error?
-		return driver.ErrBadConn
+	_, connErr := conn.helperSendAndRecv(&request)
+	if connErr != nil {
+		err <- driver.ErrBadConn
 	}
-	return nil
+	err <- nil
+}
+
+// Ping implmenets Pinger
+func (conn *PolyphenyConn) Ping(ctx context.Context) error {
+	errChan := make(chan error)
+	go conn.pingInternal(errChan)
+	var err error
+	select {
+	case <-ctx.Done():
+		// context timeout or cancelled
+		// TODO: or we return ErrBadConn?
+		return &ClientError{
+			message: "Context cancelled or timeout",
+		}
+	case err = <-errChan:
+		return err
+	}
 }
 
 // Prepare a statement
