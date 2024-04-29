@@ -31,7 +31,7 @@ func TestSQLFlow(t *testing.T) {
 	t.Log(err)
 	err = db.Ping()
 	t.Log(err)
-	rows, err := db.Query("sql:select * from emps")
+	rows, err := db.QueryContext(context.Background(), "sql:select * from emps")
 	t.Log(err)
 	t.Log(rows.Columns())
 	for rows.Next() {

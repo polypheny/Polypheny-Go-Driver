@@ -276,6 +276,83 @@ func (conn *PolyphenyConn) Query(query string, args []driver.Value) (driver.Rows
 	return helperExtractRowsFromStatementResult(response.GetStatementResponse().GetResult())
 }
 
+// queryContextInternal is called by ExecContext, if the ctx is timeout or cancelled, QueryContext will return without waiting queryContextInternal
+//
+// TODO add args support
+func (conn *PolyphenyConn) queryContextInternal(query string, rowsChan chan *PolyphenyRows, errChan chan error) {
+	queryLanguage, queryBody, err := parseQuery(query)
+	if err != nil {
+		rowsChan <- nil
+		errChan <- err
+		return
+	}
+	request := prism.Request{
+		Type: &prism.Request_ExecuteUnparameterizedStatementRequest{
+			ExecuteUnparameterizedStatementRequest: &prism.ExecuteUnparameterizedStatementRequest{
+				LanguageName:  queryLanguage,
+				Statement:     queryBody,
+				FetchSize:     nil,
+				NamespaceName: nil,
+			},
+		},
+	}
+	response, err := conn.helperSendAndRecv(&request)
+	if err != nil {
+		rowsChan <- nil
+		errChan <- err
+		return
+	}
+	requestID := response.GetStatementResponse().GetStatementId()
+	buf, err := conn.recv(8) // this is the query result
+	if err != nil {
+		rowsChan <- nil
+		errChan <- err
+		return
+	}
+	err = proto.Unmarshal(buf, response)
+	if err != nil {
+		rowsChan <- nil
+		errChan <- err
+		return
+	}
+	// is this an error?
+	if requestID != response.GetStatementResponse().GetStatementId() {
+		rowsChan <- nil
+		errChan <- nil
+		return
+	}
+	result, err := helperExtractRowsFromStatementResult(response.GetStatementResponse().GetResult())
+	if err != nil {
+		rowsChan <- nil
+		errChan <- err
+		return
+	} else {
+		rowsChan <- result.(*PolyphenyRows)
+		errChan <- err
+		return
+	}
+}
+
+// QueryContext executes a query that returns data under Context
+//
+// TODO add fetch size, namespace and args support.
+// TODO for args support, can we first prepare it and then exec?
+func (conn *PolyphenyConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	errChan := make(chan error)
+	rowsChan := make(chan *PolyphenyRows)
+	var err error
+	var result *PolyphenyRows
+	go conn.queryContextInternal(query, rowsChan, errChan)
+	select {
+	case <-ctx.Done():
+		// context timeout or cancelled
+		return nil, ctx.Err()
+	case result = <-rowsChan:
+		err = <-errChan
+		return result, err
+	}
+}
+
 // Many requests to the server have a similar pattern
 // Client first sends the length of the message, and then the message itself
 // TODO: Currently only little endian is supported
