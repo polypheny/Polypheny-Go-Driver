@@ -120,11 +120,19 @@ func (conn *PolyphenyConn) Close() error {
 }
 
 // Begin starts a new transaction
-// TODO: does prism interface currently have a BeginTransactionRequest?
 // TODO: add support to ConnBeginTx
 // Deprecated
 func (conn *PolyphenyConn) Begin() (driver.Tx, error) {
-	return nil, nil
+	return &PolyphenyTranaction{
+		conn: conn,
+	}, nil
+}
+
+// BeginTx starts a transaction
+func (conn *PolyphenyConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
+	return &PolyphenyTranaction{
+		conn: conn,
+	}, nil
 }
 
 // Exec executes a query that doesn't return data
