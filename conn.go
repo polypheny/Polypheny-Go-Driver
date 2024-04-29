@@ -160,6 +160,83 @@ func (conn *PolyphenyConn) Exec(query string, args []driver.Value) (driver.Resul
 	return helperExtractResultFromStatementResult(response.GetStatementResponse().GetResult())
 }
 
+// execContextInternal is called by ExecContext, if the ctx is timeout or cancelled, ExecContext will return without waiting execContextInternal
+//
+// TODO add args support
+func (conn *PolyphenyConn) execContextInternal(query string, resultChan chan *PolyphenyResult, errChan chan error) {
+	queryLanguage, queryBody, err := parseQuery(query)
+	if err != nil {
+		resultChan <- nil
+		errChan <- err
+		return
+	}
+	request := prism.Request{
+		Type: &prism.Request_ExecuteUnparameterizedStatementRequest{
+			ExecuteUnparameterizedStatementRequest: &prism.ExecuteUnparameterizedStatementRequest{
+				LanguageName:  queryLanguage,
+				Statement:     queryBody,
+				FetchSize:     nil,
+				NamespaceName: nil,
+			},
+		},
+	}
+	response, err := conn.helperSendAndRecv(&request)
+	if err != nil {
+		resultChan <- nil
+		errChan <- err
+		return
+	}
+	requestID := response.GetStatementResponse().GetStatementId()
+	buf, err := conn.recv(8) // this is the query result
+	if err != nil {
+		resultChan <- nil
+		errChan <- err
+		return
+	}
+	err = proto.Unmarshal(buf, response)
+	if err != nil {
+		resultChan <- nil
+		errChan <- err
+		return
+	}
+	// is this an error?
+	if requestID != response.GetStatementResponse().GetStatementId() {
+		resultChan <- nil
+		errChan <- nil
+		return
+	}
+	result, err := helperExtractResultFromStatementResult(response.GetStatementResponse().GetResult())
+	if err != nil {
+		resultChan <- nil
+		errChan <- err
+		return
+	} else {
+		resultChan <- result.(*PolyphenyResult)
+		errChan <- err
+		return
+	}
+}
+
+// ExecContext executes a query that doesn't return data under Context
+//
+// TODO add fetch size, namespace and args support.
+// TODO for args support, can we first prepare it and then exec?
+func (conn *PolyphenyConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	errChan := make(chan error)
+	resultChan := make(chan *PolyphenyResult)
+	var err error
+	var result *PolyphenyResult
+	go conn.execContextInternal(query, resultChan, errChan)
+	select {
+	case <-ctx.Done():
+		// context timeout or cancelled
+		return nil, ctx.Err()
+	case result = <-resultChan:
+		err = <-errChan
+		return result, err
+	}
+}
+
 // Exec executes a query that doesn't return data
 // TODO: add fetch size, namespace and args support.
 // TODO: for args support, can we first prepare it and then exec?

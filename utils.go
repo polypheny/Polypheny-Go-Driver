@@ -117,6 +117,19 @@ func helperConvertValueToProto(args []driver.Value) ([]*prism.ProtoValue, error)
 	return pvs, nil
 }
 
+// namedValuesToProto converts an array of NamedValue values to an array of ProtoValue
+func namedValuesToProto(args []driver.NamedValue) ([]*prism.ProtoValue, error) {
+	pvs := make([]*prism.ProtoValue, len(args))
+	for _, v := range args {
+		pv, err := makeProtoValue(v.Value)
+		if err != nil {
+			return nil, err
+		}
+		pvs[v.Ordinal] = pv
+	}
+	return pvs, nil
+}
+
 func canConvertDocumentToRelational(documents []*prism.ProtoDocument) (bool, []string) {
 	keys := make([]string, len(documents[0].GetEntries()))
 	isFirst := true
