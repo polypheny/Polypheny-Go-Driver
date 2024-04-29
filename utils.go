@@ -125,7 +125,7 @@ func helperConvertNamedvalueToProto(args []driver.NamedValue) ([]*prism.ProtoVal
 		if err != nil {
 			return nil, err
 		}
-		pvs[v.Ordinal] = pv
+		pvs[v.Ordinal-1] = pv
 	}
 	return pvs, nil
 }
