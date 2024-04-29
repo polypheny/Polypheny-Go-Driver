@@ -117,8 +117,8 @@ func helperConvertValueToProto(args []driver.Value) ([]*prism.ProtoValue, error)
 	return pvs, nil
 }
 
-// namedValuesToProto converts an array of NamedValue values to an array of ProtoValue
-func namedValuesToProto(args []driver.NamedValue) ([]*prism.ProtoValue, error) {
+// helperConvertNamedvalueToProto converts an array of NamedValue values to an array of ProtoValue
+func helperConvertNamedvalueToProto(args []driver.NamedValue) ([]*prism.ProtoValue, error) {
 	pvs := make([]*prism.ProtoValue, len(args))
 	for _, v := range args {
 		pv, err := makeProtoValue(v.Value)

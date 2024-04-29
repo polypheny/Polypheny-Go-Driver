@@ -84,7 +84,7 @@ func TestExecFlow(t *testing.T) {
 	t.Log(result.RowsAffected())
 	stmt, err := db.Prepare("sql:select * from mytable where id = ?")
 	t.Log(err)
-	rows, err := stmt.Query(1)
+	rows, err := stmt.QueryContext(context.Background(), 1)
 	t.Log(err)
 	//rows, _ := db.Query("sql:select * from mytable")
 	t.Log(rows.Columns())
