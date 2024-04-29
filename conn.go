@@ -21,6 +21,12 @@ type PolyphenyConn struct {
 	isConnected atomic.Int32 // Connection status
 }
 
+// IsValid implements Validator interface
+func (conn *PolyphenyConn) IsValid() bool {
+	// don't think its necessary to do a connection check here
+	return conn.isConnected.Load() == statusPolyphenyConnected
+}
+
 // ping pings a connection and sending the result via the error channel
 func (conn *PolyphenyConn) pingInternal(err chan error) {
 	status := conn.isConnected.Load()
