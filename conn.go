@@ -130,9 +130,14 @@ func (conn *PolyphenyConn) Begin() (driver.Tx, error) {
 
 // BeginTx starts a transaction
 func (conn *PolyphenyConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
-	return &PolyphenyTranaction{
-		conn: conn,
-	}, nil
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+		return &PolyphenyTranaction{
+			conn: conn,
+		}, nil
+	}
 }
 
 // Exec executes a query that doesn't return data
