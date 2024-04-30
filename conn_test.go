@@ -23,7 +23,7 @@ func TestIsValid(t *testing.T) {
 		t.Errorf("Failed to set connection status, the status is %d, but should be %d.", conn.isConnected.Load(), statusServerConnected)
 	}
 	conn.isConnected.Store(statusPolyphenyConnected)
-	if conn.IsValid() != false {
+	if conn.IsValid() == false {
 		t.Errorf("Failed to set connection status, the status is %d, but should be %d.", conn.isConnected.Load(), statusPolyphenyConnected)
 	}
 }
