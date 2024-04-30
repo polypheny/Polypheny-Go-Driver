@@ -23,7 +23,7 @@ func parseDSN(name string) (string, string, string, error) {
 	}
 	addr := connectionStrings[0]
 	user := strings.Split(connectionStrings[1], ":")
-	if len(connectionStrings) != 2 {
+	if len(user) != 2 {
 		return "", "", "", &ClientError{
 			message: "Connection string (DSN) should have a format like addr:port,user:password",
 		}
