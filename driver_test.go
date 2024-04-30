@@ -1,13 +1,7 @@
 package polypheny
 
-// These flow tests will be removed when the context support is done.
-
 import (
-	//"context"
-	//"context"
-	//"database/sql"
 	testing "testing"
-	//"time"
 )
 
 func TestParseDSN(t *testing.T) {
