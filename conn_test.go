@@ -85,3 +85,92 @@ func TestPing(t *testing.T) {
 		t.Errorf("Expected to receive a ClientError error but got %s", err.Error())
 	}
 }
+
+func TestPrepare(t *testing.T) {
+	connector := Connector{
+		address:  "localhost:20590",
+		username: "pa",
+		password: "",
+	}
+	conn, err := connector.Connect(context.Background())
+	if err != nil {
+		t.Error(err)
+	}
+	stmt, err := conn.(*PolyphenyConn).Prepare("sql:SELECT * FROM emps WHERE name = ?")
+	if err != nil {
+		t.Error(err)
+	}
+	if len(stmt.(*PreparedStatement).args) != 1 {
+		t.Errorf("Expected 1 arg in the prepared statement, but got %d", len(stmt.(*PreparedStatement).args))
+	}
+	stmt, err = conn.(*PolyphenyConn).Prepare("sql:SELECT * FROM emps WHERE name = ? AND salary = ?")
+	if err != nil {
+		t.Error(err)
+	}
+	if len(stmt.(*PreparedStatement).args) != 2 {
+		t.Errorf("Expected 2 args in the prepared statement, but got %d", len(stmt.(*PreparedStatement).args))
+	}
+}
+
+func TestClose(t *testing.T) {
+	connector := Connector{
+		address:  "localhost:20590",
+		username: "pa",
+		password: "",
+	}
+	conn, err := connector.Connect(context.Background())
+	if err != nil {
+		t.Error(err)
+	}
+	err = conn.(*PolyphenyConn).close()
+	if err != nil {
+		t.Error(err)
+	}
+	if conn.(*PolyphenyConn).isConnected.Load() != statusDisconnected {
+		t.Errorf("The connection status should be %d, but got %d", statusDisconnected, conn.(*PolyphenyConn).isConnected.Load())
+	}
+}
+
+func TestBegin(t *testing.T) {
+	connector := Connector{
+		address:  "localhost:20590",
+		username: "pa",
+		password: "",
+	}
+	conn, err := connector.Connect(context.Background())
+	if err != nil {
+		t.Error(err)
+	}
+	tx, err := conn.(*PolyphenyConn).Begin()
+	if err != nil {
+		t.Error(err)
+	}
+	if tx.(*PolyphenyTranaction).conn != conn {
+		t.Error("Error when trys to start a transaction")
+	}
+}
+
+func TestBeginTx(t *testing.T) {
+	connector := Connector{
+		address:  "localhost:20590",
+		username: "pa",
+		password: "",
+	}
+	conn, err := connector.Connect(context.Background())
+	if err != nil {
+		t.Error(err)
+	}
+	tx, err := conn.(*PolyphenyConn).BeginTx(context.Background(), driver.TxOptions{})
+	if err != nil {
+		t.Error(err)
+	}
+	if tx.(*PolyphenyTranaction).conn != conn {
+		t.Error("Error when trys to start a transaction")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = conn.(*PolyphenyConn).BeginTx(ctx, driver.TxOptions{})
+	if err != ctx.Err() {
+		t.Error("context didn't work")
+	}
+}
