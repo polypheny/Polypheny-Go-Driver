@@ -39,25 +39,25 @@ func TestPingInternal(t *testing.T) {
 		t.Error(err)
 	}
 	errChan := make(chan error)
-	conn.(*PolyphenyConn).pingInternal(errChan)
+	go conn.(*PolyphenyConn).pingInternal(errChan)
 	err = <-errChan
 	if err != nil {
 		t.Error(err)
 	}
 	conn.(*PolyphenyConn).isConnected.Store(statusDisconnected)
-	conn.(*PolyphenyConn).pingInternal(errChan)
+	go conn.(*PolyphenyConn).pingInternal(errChan)
 	err = <-errChan
 	if err != driver.ErrBadConn {
 		t.Errorf("Expected to receive an ErrBadConn but got %s", err.Error())
 	}
 	conn.(*PolyphenyConn).isConnected.Store(statusServerConnected)
-	conn.(*PolyphenyConn).pingInternal(errChan)
+	go conn.(*PolyphenyConn).pingInternal(errChan)
 	err = <-errChan
 	if err.Error() != "Ping: invalid connection to Polypheny server" {
 		t.Errorf("Expected to receive a ClientError but got %s", err.Error())
 	}
 	conn.(*PolyphenyConn).isConnected.Store(statusPolyphenyConnected)
-	conn.(*PolyphenyConn).pingInternal(errChan)
+	go conn.(*PolyphenyConn).pingInternal(errChan)
 	err = <-errChan
 	if err != nil {
 		t.Error(err)
