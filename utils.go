@@ -4,6 +4,7 @@ import (
 	driver "database/sql/driver"
 	fmt "fmt"
 	strings "strings"
+	"sync/atomic"
 
 	prism "github.com/polypheny/Polypheny-Go-Driver/protos"
 )
@@ -206,11 +207,13 @@ func helperExtractRowsFromStatementResult(result *prism.StatementResult) (driver
 			}
 			values = append(values, currentRow)
 		}
-		return &PolyphenyRows{
+		result := &PolyphenyRows{
 			columns:   columns,
 			result:    values,
-			readIndex: 0,
-		}, nil
+			readIndex: atomic.Int32{},
+		}
+		result.readIndex.Store(0)
+		return result, nil
 	} else if frame.GetDocumentFrame() != nil {
 		documentData := frame.GetDocumentFrame().GetDocuments()
 		canConvert, columns := canConvertDocumentToRelational(documentData)
@@ -235,11 +238,13 @@ func helperExtractRowsFromStatementResult(result *prism.StatementResult) (driver
 				}
 				values = append(values, currentRow)
 			}
-			return &PolyphenyRows{
+			result := &PolyphenyRows{
 				columns:   columns,
 				result:    values,
-				readIndex: 0,
-			}, nil
+				readIndex: atomic.Int32{},
+			}
+			result.readIndex.Store(0)
+			return result, nil
 		}
 		// if we can't transform
 		// TODO: need a better way to return the result
@@ -263,11 +268,13 @@ func helperExtractRowsFromStatementResult(result *prism.StatementResult) (driver
 		columns = make([]string, 2)
 		columns[0] = "key"
 		columns[1] = "value"
-		return &PolyphenyRows{
+		result := &PolyphenyRows{
 			columns:   columns,
 			result:    values,
-			readIndex: 0,
-		}, nil
+			readIndex: atomic.Int32{},
+		}
+		result.readIndex.Store(0)
+		return result, nil
 	} else {
 		// graph is currently not supported
 		return nil, &ClientError{
