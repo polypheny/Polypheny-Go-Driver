@@ -20,10 +20,11 @@ type Connector struct {
 }
 
 // Connect connects to a Polypheny server and returns PolyphenyConn which implements driver.Conn
-func (c *Connector) Connect(context.Context) (driver.Conn, error) {
+func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 	// Step 1, dial to the server
 	// TODO: does polypheny also use other networks?
-	netConn, err := net.Dial("tcp", c.address)
+	var d net.Dialer
+	netConn, err := d.DialContext(ctx, "tcp", c.address)
 	if err != nil {
 		return nil, err
 	}
