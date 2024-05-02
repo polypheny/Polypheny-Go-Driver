@@ -17,7 +17,17 @@ func TestConnect(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if err.Error() != ctx.Err().Error() {
+	_, err = connector.(*Connector).Connect(ctx)
+	if err.Error() != "dial tcp: lookup localhost: operation was canceled" {
 		t.Error(err)
 	}
+}
+
+func TestDriver(t *testing.T) {
+	connector := Connector{
+		address:  "localhost:20590",
+		username: "pa",
+		password: "",
+	}
+	connector.Driver()
 }

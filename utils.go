@@ -56,6 +56,7 @@ func makeProtoValue(value any) (*prism.ProtoValue, error) {
 				},
 			},
 		}
+	case int:
 	case int32:
 		result = prism.ProtoValue{
 			Value: &prism.ProtoValue_Integer{
