@@ -70,6 +70,11 @@ func TestStmtExec(t *testing.T) {
 	if result.(*PolyphenyResult).rowsAffected != 1 {
 		t.Errorf("The number of affected rows should be 1 but got %d", result.(*PolyphenyResult).rowsAffected)
 	}
+	args[0] = PolyphenyConn{}
+	_, err = stmt.(*PreparedStatement).Exec(args)
+	if err == nil {
+		t.Error("Expecting error")
+	}
 }
 
 func TestStmtExecInternal(t *testing.T) {
@@ -108,6 +113,16 @@ func TestStmtExecInternal(t *testing.T) {
 	}
 	if result.rowsAffected != 1 {
 		t.Errorf("The number of affected rows should be 1 but got %d", result.rowsAffected)
+	}
+	args[0] = driver.NamedValue{
+		Ordinal: 1,
+		Value:   PolyphenyConn{},
+	}
+	go stmt.(*PreparedStatement).execContextInternal(args, resultChan, errChan)
+	//_ = <-resultChan
+	err = <-errChan
+	if err == nil {
+		t.Error("Expecting error")
 	}
 }
 

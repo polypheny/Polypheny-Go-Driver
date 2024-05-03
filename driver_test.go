@@ -33,6 +33,10 @@ func TestOpen(t *testing.T) {
 		t.Error(err)
 	}
 	conn.Close()
+	_, err = d.Open("localhost:20590,pa")
+	if err == nil {
+		t.Error("Expecting error")
+	}
 }
 
 func TestOpenConnector(t *testing.T) {
@@ -40,5 +44,9 @@ func TestOpenConnector(t *testing.T) {
 	_, err := d.OpenConnector("localhost:20590,pa:")
 	if err != nil {
 		t.Error(err)
+	}
+	_, err = d.OpenConnector("localhost:20590,pa")
+	if err == nil {
+		t.Error("Expecting error")
 	}
 }
