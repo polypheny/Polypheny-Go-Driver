@@ -306,7 +306,27 @@ func TestQuery(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if len(rows.(*PolyphenyRows).Columns()) != 0 && rows.(*PolyphenyRows).Columns()[0] != "name" {
+	if len(rows.(*PolyphenyRows).Columns()) != 1 || rows.(*PolyphenyRows).Columns()[0] != "name" {
+		t.Error("Error in Query")
+	}
+}
+
+func TestQueryMongo(t *testing.T) {
+	connector := Connector{
+		address:  "localhost:20590",
+		username: "pa",
+		password: "",
+	}
+	conn, err := connector.Connect(context.Background())
+	if err != nil {
+		t.Error(err)
+	}
+	defer conn.(*PolyphenyConn).Close()
+	rows, err := conn.(*PolyphenyConn).Query("mongo:db.emps.find()", nil)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(rows.(*PolyphenyRows).Columns()) != 5 {
 		t.Error("Error in Query")
 	}
 }
