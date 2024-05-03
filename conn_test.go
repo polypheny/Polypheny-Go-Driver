@@ -310,7 +310,7 @@ func TestQuery(t *testing.T) {
 		t.Error(err)
 	}
 	defer conn.(*PolyphenyConn).Close()
-	_, err = conn.(*PolyphenyConn).Query("sql:SELECT name FROM emps WHERE name = 'Bill'", nil)
+	_, err = conn.(*PolyphenyConn).Query("SELECT name FROM emps WHERE name = 'Bill'", nil)
 	if err == nil {
 		t.Error("Expecting err")
 	}
