@@ -207,6 +207,10 @@ func TestExec(t *testing.T) {
 		t.Error(err)
 	}
 	defer conn.(*PolyphenyConn).Close()
+	_, err = conn.(*PolyphenyConn).Exec("DROP TABLE IF EXISTS mytable", nil)
+	if err == nil {
+		t.Error("Expecting err")
+	}
 	_, err = conn.(*PolyphenyConn).Exec("sql:DROP TABLE IF EXISTS mytable", nil)
 	if err != nil {
 		t.Error(err)
@@ -306,6 +310,10 @@ func TestQuery(t *testing.T) {
 		t.Error(err)
 	}
 	defer conn.(*PolyphenyConn).Close()
+	_, err = conn.(*PolyphenyConn).Query("sql:SELECT name FROM emps WHERE name = 'Bill'", nil)
+	if err == nil {
+		t.Error("Expecting err")
+	}
 	rows, err := conn.(*PolyphenyConn).Query("sql:SELECT name FROM emps WHERE name = 'Bill'", nil)
 	if err != nil {
 		t.Error(err)
@@ -349,6 +357,12 @@ func TestQueryInternal(t *testing.T) {
 	errChan := make(chan error)
 	rowsChan := make(chan *PolyphenyRows)
 	var result *PolyphenyRows
+	go conn.(*PolyphenyConn).queryContextInternal("SELECT name FROM emps WHERE name = 'Bill'", rowsChan, errChan)
+	result = <-rowsChan
+	err = <-errChan
+	if err == nil {
+		t.Errorf("Expecting error %v", result)
+	}
 	go conn.(*PolyphenyConn).queryContextInternal("sql:SELECT name FROM emps WHERE name = 'Bill'", rowsChan, errChan)
 	result = <-rowsChan
 	err = <-errChan
@@ -379,7 +393,7 @@ func TestQueryContext(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err = conn.(*PolyphenyConn).ExecContext(ctx, "sql:SELECT name FROM emps WHERE name = 'Bill'", nil)
+	_, err = conn.(*PolyphenyConn).QueryContext(ctx, "sql:SELECT name FROM emps WHERE name = 'Bill'", nil)
 	if err != ctx.Err() {
 		t.Error(err)
 	}
