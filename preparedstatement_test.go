@@ -119,10 +119,10 @@ func TestStmtExecInternal(t *testing.T) {
 		Value:   PolyphenyConn{},
 	}
 	go stmt.(*PreparedStatement).execContextInternal(args, resultChan, errChan)
-	//_ = <-resultChan
+	result = <-resultChan
 	err = <-errChan
 	if err == nil {
-		t.Error("Expecting error")
+		t.Errorf("Expecting error %v", result)
 	}
 }
 
@@ -191,6 +191,11 @@ func TestStmtQuery(t *testing.T) {
 	if len(rows.(*PolyphenyRows).Columns()) != 0 && rows.(*PolyphenyRows).Columns()[0] != "name" {
 		t.Error("Error in Query")
 	}
+	args[0] = PolyphenyConn{}
+	_, err = stmt.(*PreparedStatement).Query(args)
+	if err == nil {
+		t.Error("Expecting error")
+	}
 }
 
 func TestStmtQueryInternal(t *testing.T) {
@@ -223,6 +228,16 @@ func TestStmtQueryInternal(t *testing.T) {
 		t.Error("Error in queryContextInternal, result should not be nil")
 	} else if len(result.Columns()) != 0 && result.Columns()[0] != "name" {
 		t.Error("Error in queryContextInternal")
+	}
+	args[0] = driver.NamedValue{
+		Ordinal: 1,
+		Value:   PolyphenyConn{},
+	}
+	go stmt.(*PreparedStatement).queryContextInternal(args, rowsChan, errChan)
+	result = <-rowsChan
+	err = <-errChan
+	if err == nil {
+		t.Errorf("Expecting error %v", result)
 	}
 }
 

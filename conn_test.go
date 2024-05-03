@@ -103,6 +103,10 @@ func TestPrepare(t *testing.T) {
 		t.Error(err)
 	}
 	defer conn.(*PolyphenyConn).Close()
+	_, err = conn.(*PolyphenyConn).Prepare("SELECT * FROM emps WHERE name = ?")
+	if err == nil {
+		t.Error("Expecting error")
+	}
 	stmt, err := conn.(*PolyphenyConn).Prepare("sql:SELECT * FROM emps WHERE name = ?")
 	if err != nil {
 		t.Error(err)
