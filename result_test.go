@@ -5,9 +5,19 @@ import (
 )
 
 func TestLastInsertId(t *testing.T) {
-	_ = PolyphenyResult{}
+	result := PolyphenyResult{}
+	_, err := result.LastInsertId()
+	if err == nil {
+		t.Error("Expecting clienterror")
+	}
 }
 
 func TestRowsAffected(t *testing.T) {
-	_ = PolyphenyResult{}
+	result := PolyphenyResult{
+		rowsAffected: 0,
+	}
+	_, err := result.RowsAffected()
+	if err != nil {
+		t.Error(err)
+	}
 }

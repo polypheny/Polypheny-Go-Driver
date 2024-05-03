@@ -406,6 +406,10 @@ func TestSend(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	err = conn.(*PolyphenyConn).send(serializd, 16)
+	if err.Error() != "PolyphenyConn.send() expects the lengthSize parameter is not greater than 8" {
+		t.Error(err)
+	}
 	err = conn.(*PolyphenyConn).send(serializd, 1)
 	if err.Error() != "PolyphenyConn.send(): the size of the serialized message is too large to be put in a byte array of size lengthSize" {
 		t.Error(err)
