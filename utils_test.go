@@ -51,7 +51,7 @@ func TestMakeProtoValue1(t *testing.T) {
 	}
 	value = PolyphenyConn{}
 	_, err := makeProtoValue(value)
-	if err != nil {
+	if err == nil {
 		t.Error("Expecting error")
 	}
 }
