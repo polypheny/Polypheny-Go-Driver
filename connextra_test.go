@@ -16,10 +16,8 @@ func TestQueryMongoContext(t *testing.T) {
 		t.Error(err)
 	}
 	defer conn.(*PolyphenyConn).Close()
-	result, err := conn.(*PolyphenyConn).QueryMongoContext(context.Background(), "db.emps.find()")
+	_, err = conn.(*PolyphenyConn).QueryMongoContext(context.Background(), "db.emps.find()")
 	if err != nil {
 		t.Error(err)
-	} else {
-		t.Log(result)
 	}
 }
