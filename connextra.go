@@ -12,8 +12,8 @@ func (conn *PolyphenyConn) queryMongoContextInternal(query string, resultChan ch
 	request := prism.Request{
 		Type: &prism.Request_ExecuteUnparameterizedStatementRequest{
 			ExecuteUnparameterizedStatementRequest: &prism.ExecuteUnparameterizedStatementRequest{
-				LanguageName:  query,
-				Statement:     "mongo",
+				LanguageName:  "mongo",
+				Statement:     query,
 				FetchSize:     nil,
 				NamespaceName: nil,
 			},
