@@ -68,15 +68,11 @@ func (conn *PolyphenyConn) Ping(ctx context.Context) error {
 
 // Prepare a statement
 func (conn *PolyphenyConn) Prepare(query string) (driver.Stmt, error) {
-	queryLanguage, queryBody, err := parseQuery(query)
-	if err != nil {
-		return nil, err
-	}
 	request := prism.Request{
 		Type: &prism.Request_PrepareIndexedStatementRequest{
 			PrepareIndexedStatementRequest: &prism.PrepareStatementRequest{
-				LanguageName:  queryLanguage,
-				Statement:     queryBody,
+				LanguageName:  "sql",
+				Statement:     query,
 				NamespaceName: nil,
 			},
 		},
@@ -145,15 +141,11 @@ func (conn *PolyphenyConn) BeginTx(ctx context.Context, opts driver.TxOptions) (
 // TODO: for args support, can we first prepare it and then exec?
 // Deprecated
 func (conn *PolyphenyConn) Exec(query string, args []driver.Value) (driver.Result, error) {
-	queryLanguage, queryBody, err := parseQuery(query)
-	if err != nil {
-		return nil, err
-	}
 	request := prism.Request{
 		Type: &prism.Request_ExecuteUnparameterizedStatementRequest{
 			ExecuteUnparameterizedStatementRequest: &prism.ExecuteUnparameterizedStatementRequest{
-				LanguageName:  queryLanguage,
-				Statement:     queryBody,
+				LanguageName:  "sql",
+				Statement:     query,
 				FetchSize:     nil,
 				NamespaceName: nil,
 			},
@@ -183,17 +175,11 @@ func (conn *PolyphenyConn) Exec(query string, args []driver.Value) (driver.Resul
 //
 // TODO add args support
 func (conn *PolyphenyConn) execContextInternal(query string, resultChan chan *PolyphenyResult, errChan chan error) {
-	queryLanguage, queryBody, err := parseQuery(query)
-	if err != nil {
-		resultChan <- nil
-		errChan <- err
-		return
-	}
 	request := prism.Request{
 		Type: &prism.Request_ExecuteUnparameterizedStatementRequest{
 			ExecuteUnparameterizedStatementRequest: &prism.ExecuteUnparameterizedStatementRequest{
-				LanguageName:  queryLanguage,
-				Statement:     queryBody,
+				LanguageName:  "sql",
+				Statement:     query,
 				FetchSize:     nil,
 				NamespaceName: nil,
 			},
@@ -261,15 +247,11 @@ func (conn *PolyphenyConn) ExecContext(ctx context.Context, query string, args [
 // TODO: for args support, can we first prepare it and then exec?
 // Deprecated
 func (conn *PolyphenyConn) Query(query string, args []driver.Value) (driver.Rows, error) {
-	queryLanguage, queryBody, err := parseQuery(query)
-	if err != nil {
-		return nil, err
-	}
 	request := prism.Request{
 		Type: &prism.Request_ExecuteUnparameterizedStatementRequest{
 			ExecuteUnparameterizedStatementRequest: &prism.ExecuteUnparameterizedStatementRequest{
-				LanguageName:  queryLanguage,
-				Statement:     queryBody,
+				LanguageName:  "sql",
+				Statement:     query,
 				FetchSize:     nil,
 				NamespaceName: nil,
 			},
@@ -299,17 +281,11 @@ func (conn *PolyphenyConn) Query(query string, args []driver.Value) (driver.Rows
 //
 // TODO add args support
 func (conn *PolyphenyConn) queryContextInternal(query string, rowsChan chan *PolyphenyRows, errChan chan error) {
-	queryLanguage, queryBody, err := parseQuery(query)
-	if err != nil {
-		rowsChan <- nil
-		errChan <- err
-		return
-	}
 	request := prism.Request{
 		Type: &prism.Request_ExecuteUnparameterizedStatementRequest{
 			ExecuteUnparameterizedStatementRequest: &prism.ExecuteUnparameterizedStatementRequest{
-				LanguageName:  queryLanguage,
-				Statement:     queryBody,
+				LanguageName:  "sql",
+				Statement:     query,
 				FetchSize:     nil,
 				NamespaceName: nil,
 			},

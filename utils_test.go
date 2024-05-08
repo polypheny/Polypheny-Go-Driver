@@ -5,17 +5,6 @@ import (
 	"testing"
 )
 
-func TestParseQuery(t *testing.T) {
-	_, _, err := parseQuery("SELECT 42")
-	if err.Error() != "A query should have the following format: QueryLanguage:Query" {
-		t.Error("Error parsing query")
-	}
-	_, _, err = parseQuery("sql:SELECT 42")
-	if err != nil {
-		t.Error(err)
-	}
-}
-
 func TestMakeProtoValue1(t *testing.T) {
 	var result *prism.ProtoValue
 	var value interface{}

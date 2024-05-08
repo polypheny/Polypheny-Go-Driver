@@ -3,23 +3,10 @@ package polypheny
 import (
 	driver "database/sql/driver"
 	fmt "fmt"
-	strings "strings"
 	"sync/atomic"
 
 	prism "github.com/polypheny/Polypheny-Go-Driver/protos"
 )
-
-// ParseQuery splits the query language and the actual query
-// TODO: add namespace support
-func parseQuery(query string) (string, string, error) {
-	splitted := strings.Split(query, QueryDelimiter)
-	if len(splitted) != 2 {
-		return "", "", &ClientError{
-			message: "A query should have the following format: QueryLanguage:Query",
-		}
-	}
-	return splitted[0], splitted[1], nil
-}
 
 // convertProtoValue converts a ProtonValue to a go value
 func convertProtoValue(raw *prism.ProtoValue) (any, error) {
