@@ -223,6 +223,9 @@ func TestExec(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	if result == nil {
+		t.Error("Error: result should not be nil")
+	}
 	if result.(*PolyphenyResult).rowsAffected != 1 {
 		t.Errorf("The number of affected rows should be 1 but got %d", result.(*PolyphenyResult).rowsAffected)
 	}
@@ -337,6 +340,9 @@ func TestQueryMongo(t *testing.T) {
 	rows, err := conn.(*PolyphenyConn).Query("mongo:db.emps.find()", nil)
 	if err != nil {
 		t.Error(err)
+	}
+	if rows == nil {
+		t.Error("Error: rows should not be nil")
 	}
 	if len(rows.(*PolyphenyRows).Columns()) != 5 {
 		t.Error("Error in Query")
