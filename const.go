@@ -2,8 +2,8 @@ package polypheny
 
 // Connection/API versions
 const (
-	majorApiVersion  = 2
-	minorApiVersion  = 0
+	majorApiVersion  = 1
+	minorApiVersion  = 2
 	transportVersion = "plain-v1@polypheny.com\n"
 )
 
@@ -13,6 +13,3 @@ const (
 	statusServerConnected    = int32(1)
 	statusPolyphenyConnected = int32(2)
 )
-
-// The delimiter between query language name and the actual query
-const QueryDelimiter = ":"

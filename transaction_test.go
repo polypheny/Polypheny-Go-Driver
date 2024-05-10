@@ -21,15 +21,15 @@ func TestCommit(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = conn.(*PolyphenyConn).ExecContext(context.Background(), "sql:DROP TABLE IF EXISTS mytable", nil)
+	_, err = conn.(*PolyphenyConn).ExecContext(context.Background(), "DROP TABLE IF EXISTS mytable", nil)
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = conn.(*PolyphenyConn).ExecContext(context.Background(), "sql:CREATE TABLE mytable(id int not null, primary key(id))", nil)
+	_, err = conn.(*PolyphenyConn).ExecContext(context.Background(), "CREATE TABLE mytable(id int not null, primary key(id))", nil)
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = conn.(*PolyphenyConn).ExecContext(context.Background(), "sql:insert into mytable values(1)", nil)
+	_, err = conn.(*PolyphenyConn).ExecContext(context.Background(), "insert into mytable values(1)", nil)
 	if err != nil {
 		t.Error(err)
 	}
@@ -54,15 +54,15 @@ func TestRollback(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = conn.(*PolyphenyConn).ExecContext(context.Background(), "sql:DROP TABLE IF EXISTS mytable", nil)
+	_, err = conn.(*PolyphenyConn).ExecContext(context.Background(), "DROP TABLE IF EXISTS mytable", nil)
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = conn.(*PolyphenyConn).ExecContext(context.Background(), "sql:CREATE TABLE mytable(id int not null, primary key(id))", nil)
+	_, err = conn.(*PolyphenyConn).ExecContext(context.Background(), "CREATE TABLE mytable(id int not null, primary key(id))", nil)
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = conn.(*PolyphenyConn).ExecContext(context.Background(), "sql:insert into mytable values(1)", nil)
+	_, err = conn.(*PolyphenyConn).ExecContext(context.Background(), "insert into mytable values(1)", nil)
 	if err != nil {
 		t.Error(err)
 	}
