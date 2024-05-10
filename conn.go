@@ -8,7 +8,7 @@ import (
 	net "net"
 	atomic "sync/atomic"
 
-	prism "github.com/polypheny/Polypheny-Go-Driver/protos"
+	prism "github.com/polypheny/Polypheny-Go-Driver/prism"
 
 	proto "google.golang.org/protobuf/proto"
 )

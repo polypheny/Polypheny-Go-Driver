@@ -4,7 +4,7 @@ import (
 	context "context"
 	driver "database/sql/driver"
 
-	prism "github.com/polypheny/Polypheny-Go-Driver/protos"
+	prism "github.com/polypheny/Polypheny-Go-Driver/prism"
 )
 
 // PreparedStatement implments Stmt, StmtExecContext and StmtQueryContext

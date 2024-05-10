@@ -1,9 +1,13 @@
 package polypheny
 
+import (
+	prism "github.com/polypheny/Polypheny-Go-Driver/prism"
+)
+
 // Connection/API versions
 const (
-	majorApiVersion  = 1
-	minorApiVersion  = 2
+	majorApiVersion  = prism.MajorVersion
+	minorApiVersion  = prism.MinorVersion
 	transportVersion = "plain-v1@polypheny.com\n"
 )
 

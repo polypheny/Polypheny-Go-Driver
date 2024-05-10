@@ -1,7 +1,7 @@
 package polypheny
 
 import (
-	prism "github.com/polypheny/Polypheny-Go-Driver/protos"
+	prism "github.com/polypheny/Polypheny-Go-Driver/prism"
 )
 
 type PolyphenyTranaction struct {

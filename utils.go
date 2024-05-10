@@ -5,7 +5,7 @@ import (
 	fmt "fmt"
 	"sync/atomic"
 
-	prism "github.com/polypheny/Polypheny-Go-Driver/protos"
+	prism "github.com/polypheny/Polypheny-Go-Driver/prism"
 )
 
 // convertProtoValue converts a ProtonValue to a go value

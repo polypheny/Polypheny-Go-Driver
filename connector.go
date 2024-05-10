@@ -8,7 +8,7 @@ import (
 
 	context "golang.org/x/net/context"
 
-	prism "github.com/polypheny/Polypheny-Go-Driver/protos"
+	prism "github.com/polypheny/Polypheny-Go-Driver/prism"
 )
 
 // Connector implements the driver.Connector interface
