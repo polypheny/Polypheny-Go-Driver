@@ -119,41 +119,6 @@ func helperConvertNamedvalueToProto(args []driver.NamedValue) ([]*prism.ProtoVal
 	return pvs, nil
 }
 
-func canConvertDocumentToRelational(documents []*prism.ProtoDocument) (bool, []string) {
-	keys := make([]string, len(documents[0].GetEntries()))
-	isFirst := true
-	for _, document := range documents {
-		if isFirst {
-			isFirst = false
-			for i, kvpair := range document.GetEntries() {
-				key, _ := convertProtoValue(kvpair.GetKey())
-				switch key := key.(type) {
-				case string:
-					keys[i] = key
-				default:
-					return false, nil
-				}
-			}
-		} else {
-			if len(document.GetEntries()) != len(keys) {
-				return false, nil
-			}
-			for i, kvpair := range document.GetEntries() {
-				key, _ := convertProtoValue(kvpair.GetKey())
-				switch key := key.(type) {
-				case string:
-					if key != keys[i] {
-						return false, nil
-					}
-				default:
-					return false, nil
-				}
-			}
-		}
-	}
-	return true, keys
-}
-
 // helperExtractResultFromStatementResult collects affectedRows and lastInsertId from StatementResult
 // TODO: does polypheny currently have lastInsertId?
 func helperExtractResultFromStatementResult(result *prism.StatementResult) (driver.Result, error) {
@@ -201,71 +166,9 @@ func helperExtractRowsFromStatementResult(result *prism.StatementResult) (driver
 		}
 		result.readIndex.Store(0)
 		return result, nil
-	} else if frame.GetDocumentFrame() != nil {
-		documentData := frame.GetDocumentFrame().GetDocuments()
-		canConvert, columns := canConvertDocumentToRelational(documentData)
-		if canConvert {
-			// if the documents have exactly the same schema
-			// we will transform the query result into relational
-			// the key will be the column name
-			var currentRow []any
-			for _, document := range documentData {
-				currentRow = make([]any, len(columns))
-				for _, kvpair := range document.GetEntries() {
-					key, _ := convertProtoValue(kvpair.GetKey())
-					for ki, k := range columns {
-						if key == k {
-							converted, err := convertProtoValue(kvpair.GetValue())
-							if err != nil {
-								return nil, err
-							}
-							currentRow[ki] = converted
-						}
-					}
-				}
-				values = append(values, currentRow)
-			}
-			result := &PolyphenyRows{
-				columns:   columns,
-				result:    values,
-				readIndex: atomic.Int32{},
-			}
-			result.readIndex.Store(0)
-			return result, nil
-		}
-		// if we can't transform
-		// TODO: need a better way to return the result
-		for _, entries := range documentData {
-			for _, v := range entries.GetEntries() {
-				key, err := convertProtoValue(v.GetKey())
-				if err != nil {
-					return nil, err
-				}
-				value, err := convertProtoValue(v.GetValue())
-				if err != nil {
-					return nil, err
-				}
-				//currentDocument = append(currentDocument, kv)
-				currentRow := make([]any, 2)
-				currentRow[0] = key
-				currentRow[1] = value
-				values = append(values, currentRow)
-			}
-		}
-		columns = make([]string, 2)
-		columns[0] = "key"
-		columns[1] = "value"
-		result := &PolyphenyRows{
-			columns:   columns,
-			result:    values,
-			readIndex: atomic.Int32{},
-		}
-		result.readIndex.Store(0)
-		return result, nil
 	} else {
-		// graph is currently not supported
 		return nil, &ClientError{
-			message: "Graph queries are currently not supported by Prism interface",
+			message: "Query expects to return data, however the result is empty",
 		}
 	}
 }
