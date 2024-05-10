@@ -1,4 +1,5 @@
 // connextra defines extra functions which are not part of the sql/driver interface
+// Document queroes and graph queries(not supported yet) will call these functions
 package polypheny
 
 import (
