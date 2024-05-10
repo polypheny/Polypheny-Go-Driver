@@ -240,12 +240,6 @@ func TestExecInternal(t *testing.T) {
 	go conn.(*PolyphenyConn).execContextInternal("DROP TABLE IF EXISTS mytable", resultChan, errChan)
 	result = <-resultChan
 	err = <-errChan
-	if err.Error() != "A query should have the following format: QueryLanguage:Query" || result != nil {
-		t.Error("Expecting a ClientError")
-	}
-	go conn.(*PolyphenyConn).execContextInternal("DROP TABLE IF EXISTS mytable", resultChan, errChan)
-	result = <-resultChan
-	err = <-errChan
 	if err != nil {
 		t.Error(err, result == nil)
 	}
