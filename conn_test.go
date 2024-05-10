@@ -308,24 +308,6 @@ func TestQuery(t *testing.T) {
 	}
 }
 
-func TestQueryMongo(t *testing.T) {
-	connector := Connector{
-		address:  "localhost:20590",
-		username: "pa",
-		password: "",
-	}
-	conn, err := connector.Connect(context.Background())
-	if err != nil {
-		t.Error(err)
-	}
-	defer conn.(*PolyphenyConn).Close()
-	rows, err := conn.(*PolyphenyConn).QueryMongoContext(context.Background(), "db.emps.find()")
-	if err != nil {
-		t.Error(err)
-	}
-	t.Log(rows)
-}
-
 func TestQueryInternal(t *testing.T) {
 	connector := Connector{
 		address:  "localhost:20590",
