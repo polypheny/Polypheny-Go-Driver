@@ -13,7 +13,7 @@ func TestStmtClose(t *testing.T) {
 		t.Error(err)
 	}
 	defer conn.Close()
-	stmt, err := conn.Prepare("sql:SELECT name FROM emps WHERE name = ?")
+	stmt, err := conn.Prepare("SELECT name FROM emps WHERE name = ?")
 	if err != nil {
 		t.Error(err)
 	}
@@ -30,7 +30,7 @@ func TestNumInput(t *testing.T) {
 		t.Error(err)
 	}
 	defer conn.Close()
-	stmt, err := conn.Prepare("sql:SELECT name FROM emps WHERE name = ?")
+	stmt, err := conn.Prepare("SELECT name FROM emps WHERE name = ?")
 	if err != nil {
 		t.Error(err)
 	}
@@ -47,15 +47,15 @@ func TestStmtExec(t *testing.T) {
 		t.Error(err)
 	}
 	defer conn.Close()
-	_, err = conn.(*PolyphenyConn).Exec("sql:DROP TABLE IF EXISTS mytable", nil)
+	_, err = conn.(*PolyphenyConn).Exec("DROP TABLE IF EXISTS mytable", nil)
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = conn.(*PolyphenyConn).Exec("sql:CREATE TABLE mytable(id int not null, primary key(id))", nil)
+	_, err = conn.(*PolyphenyConn).Exec("CREATE TABLE mytable(id int not null, primary key(id))", nil)
 	if err != nil {
 		t.Error(err)
 	}
-	stmt, err := conn.Prepare("sql:insert into mytable values(?)")
+	stmt, err := conn.Prepare("insert into mytable values(?)")
 	if err != nil {
 		t.Error(err)
 	}
@@ -84,15 +84,15 @@ func TestStmtExecInternal(t *testing.T) {
 		t.Error(err)
 	}
 	defer conn.Close()
-	_, err = conn.(*PolyphenyConn).Exec("sql:DROP TABLE IF EXISTS mytable", nil)
+	_, err = conn.(*PolyphenyConn).Exec("DROP TABLE IF EXISTS mytable", nil)
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = conn.(*PolyphenyConn).Exec("sql:CREATE TABLE mytable(id int not null, primary key(id))", nil)
+	_, err = conn.(*PolyphenyConn).Exec("CREATE TABLE mytable(id int not null, primary key(id))", nil)
 	if err != nil {
 		t.Error(err)
 	}
-	stmt, err := conn.Prepare("sql:insert into mytable values(?)")
+	stmt, err := conn.Prepare("insert into mytable values(?)")
 	if err != nil {
 		t.Error(err)
 	}
@@ -137,15 +137,15 @@ func TestStmtExecContext(t *testing.T) {
 		t.Error(err)
 	}
 	defer conn.(*PolyphenyConn).Close()
-	_, err = conn.(*PolyphenyConn).Exec("sql:DROP TABLE IF EXISTS mytable", nil)
+	_, err = conn.(*PolyphenyConn).Exec("DROP TABLE IF EXISTS mytable", nil)
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = conn.(*PolyphenyConn).Exec("sql:CREATE TABLE mytable(id int not null, primary key(id))", nil)
+	_, err = conn.(*PolyphenyConn).Exec("CREATE TABLE mytable(id int not null, primary key(id))", nil)
 	if err != nil {
 		t.Error(err)
 	}
-	stmt, err := conn.Prepare("sql:insert into mytable values(?)")
+	stmt, err := conn.Prepare("insert into mytable values(?)")
 	if err != nil {
 		t.Error(err)
 	}
@@ -177,7 +177,7 @@ func TestStmtQuery(t *testing.T) {
 		t.Error(err)
 	}
 	defer conn.Close()
-	stmt, err := conn.Prepare("sql:SELECT name FROM emps WHERE name = ?")
+	stmt, err := conn.Prepare("SELECT name FROM emps WHERE name = ?")
 	if err != nil {
 		t.Error(err)
 	}
@@ -205,7 +205,7 @@ func TestStmtQueryInternal(t *testing.T) {
 		t.Error(err)
 	}
 	defer conn.Close()
-	stmt, err := conn.Prepare("sql:SELECT name FROM emps WHERE name = ?")
+	stmt, err := conn.Prepare("SELECT name FROM emps WHERE name = ?")
 	if err != nil {
 		t.Error(err)
 	}
@@ -248,7 +248,7 @@ func TestStmtQueryContext(t *testing.T) {
 		t.Error(err)
 	}
 	defer conn.Close()
-	stmt, err := conn.Prepare("sql:SELECT name FROM emps WHERE name = ?")
+	stmt, err := conn.Prepare("SELECT name FROM emps WHERE name = ?")
 	if err != nil {
 		t.Error(err)
 	}
