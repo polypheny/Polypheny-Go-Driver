@@ -22,3 +22,6 @@ go.work
 
 # build directories
 build/
+
+# ide folders
+.idea
