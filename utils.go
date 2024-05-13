@@ -124,7 +124,7 @@ func helperConvertNamedvalueToProto(args []driver.NamedValue) ([]*prism.ProtoVal
 func helperExtractResultFromStatementResult(result *prism.StatementResult) (driver.Result, error) {
 	rowsAffected := result.GetScalar()
 	return &PolyphenyResult{
-		lastInsertId: 0,
+		lastInsertId: -1,
 		rowsAffected: rowsAffected,
 	}, nil
 }
