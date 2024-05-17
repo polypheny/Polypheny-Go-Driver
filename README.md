@@ -25,7 +25,7 @@ import (
 )
 ```
 
-A demo on how to use this driver can be found in [this](https://github.com/vlowingkloude/PolyphenyGoDriverDemo) repo.
+A demo on how to use this driver can be found in [this](https://github.com/vlowingkloude/dispersion) repo.
 
 An in-depth and more detailed documentation can be found [here](https://docs.polypheny.com/en/latest/drivers/go/overview).
 
