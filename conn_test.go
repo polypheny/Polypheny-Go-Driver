@@ -161,7 +161,7 @@ func TestBegin(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if tx.(*PolyphenyTranaction).conn != conn {
+	if tx.(*PolyphenyTransaction).conn != conn {
 		t.Error("Error when trys to start a transaction")
 	}
 }
@@ -181,7 +181,7 @@ func TestBeginTx(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if tx.(*PolyphenyTranaction).conn != conn {
+	if tx.(*PolyphenyTransaction).conn != conn {
 		t.Error("Error when trys to start a transaction")
 	}
 	ctx, cancel := context.WithCancel(context.Background())

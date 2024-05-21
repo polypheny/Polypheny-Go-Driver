@@ -4,11 +4,11 @@ import (
 	prism "github.com/polypheny/Polypheny-Go-Driver/prism"
 )
 
-type PolyphenyTranaction struct {
+type PolyphenyTransaction struct {
 	conn *PolyphenyConn
 }
 
-func (tx *PolyphenyTranaction) Commit() error {
+func (tx *PolyphenyTransaction) Commit() error {
 	request := prism.Request{
 		Type: &prism.Request_CommitRequest{
 			CommitRequest: &prism.CommitRequest{},
@@ -18,7 +18,7 @@ func (tx *PolyphenyTranaction) Commit() error {
 	return err
 }
 
-func (tx *PolyphenyTranaction) Rollback() error {
+func (tx *PolyphenyTransaction) Rollback() error {
 	request := prism.Request{
 		Type: &prism.Request_RollbackRequest{
 			RollbackRequest: &prism.RollbackRequest{},

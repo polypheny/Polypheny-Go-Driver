@@ -119,7 +119,7 @@ func (conn *PolyphenyConn) Close() error {
 // TODO: add support to ConnBeginTx
 // Deprecated
 func (conn *PolyphenyConn) Begin() (driver.Tx, error) {
-	return &PolyphenyTranaction{
+	return &PolyphenyTransaction{
 		conn: conn,
 	}, nil
 }
@@ -130,7 +130,7 @@ func (conn *PolyphenyConn) BeginTx(ctx context.Context, opts driver.TxOptions) (
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	default:
-		return &PolyphenyTranaction{
+		return &PolyphenyTransaction{
 			conn: conn,
 		}, nil
 	}
@@ -242,7 +242,7 @@ func (conn *PolyphenyConn) ExecContext(ctx context.Context, query string, args [
 	}
 }
 
-// Exec executes a query that doesn't return data
+// Exec executes a query that returns data
 // TODO: add fetch size, namespace and args support.
 // TODO: for args support, can we first prepare it and then exec?
 // Deprecated
@@ -277,7 +277,7 @@ func (conn *PolyphenyConn) Query(query string, args []driver.Value) (driver.Rows
 	return helperExtractRowsFromStatementResult(response.GetStatementResponse().GetResult())
 }
 
-// queryContextInternal is called by ExecContext, if the ctx is timeout or cancelled, QueryContext will return without waiting queryContextInternal
+// queryContextInternal is called by QueryContext, if the ctx is timeout or cancelled, QueryContext will return without waiting queryContextInternal
 //
 // TODO add args support
 func (conn *PolyphenyConn) queryContextInternal(query string, rowsChan chan *PolyphenyRows, errChan chan error) {
@@ -378,7 +378,7 @@ func (conn *PolyphenyConn) send(serialized []byte, lengthSize int) error {
 }
 
 // Many responses from the server also have a similar pattern
-// Server first sents the length of a message and then the message itself
+// Server first sends the length of a message and then the message itself
 // TODO: Currently only little endian is supported
 func (conn *PolyphenyConn) recv(lengthSize int) ([]byte, error) {
 	if lengthSize > 8 {
