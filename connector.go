@@ -51,6 +51,8 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 		}
 	}
 	// Step 3, send prism connection request
+	// // auto commit is disabled
+	isAutoCommit := false
 	request := prism.Request{
 		Type: &prism.Request_ConnectionRequest{
 			ConnectionRequest: &prism.ConnectionRequest{
@@ -58,6 +60,9 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 				MinorApiVersion: minorApiVersion,
 				Username:        &conn.username,
 				Password:        &c.password,
+				ConnectionProperties: &prism.ConnectionProperties{
+					IsAutoCommit: &isAutoCommit,
+				},
 			},
 		},
 	}
