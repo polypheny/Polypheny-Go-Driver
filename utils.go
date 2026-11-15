@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/polypheny/Polypheny-Prism-API/go/v2/prism"
+	"github.com/polypheny/Polypheny-Go-Driver/prism"
 )
 
 // convertProtoValue converts a Prism value into a Go value.

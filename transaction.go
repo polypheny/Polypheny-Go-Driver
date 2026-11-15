@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/polypheny/Polypheny-Prism-API/go/v2/prism"
+	"github.com/polypheny/Polypheny-Go-Driver/prism"
 )
 
 // PolyphenyTransaction implements driver.Tx.

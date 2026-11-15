@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/polypheny/Polypheny-Prism-API/go/v2/prism"
+	"github.com/polypheny/Polypheny-Go-Driver/prism"
 )
 
 // Connector implements driver.Connector.
