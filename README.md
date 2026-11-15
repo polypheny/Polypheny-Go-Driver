@@ -16,7 +16,7 @@ MQL queries and Prism entity metadata.
 ## Installation
 
 Use Go 1.23 or newer and a Polypheny server with a compatible Prism 2.x
-interface. The driver uses the released Prism 2.2 Go bindings as a Go module.
+interface. The driver includes the generated Go bindings from the Prism 2.2 release.
 Document collection metadata requires server-side Prism 2.2 support.
 
 ```sh
@@ -80,6 +80,8 @@ Import the driver as `polypheny` instead of the blank import and use
 queries an existing `employees` collection or table in the default
 namespace, then lists the entities in `public`. Call
 `SearchEntities` with a pattern pointer to filter the results.
+The response types are available in
+`github.com/polypheny/Polypheny-Go-Driver/prism`.
 
 ```go
 conn, err := db.Conn(ctx)
@@ -120,6 +122,13 @@ that supports Prism 2.2. The tests create and remove their own fixtures.
 ```sh
 POLYPHENY_TEST_DSN='localhost:20590,pa:' go test -count=1 -run '^TestIntegration' ./...
 ```
+
+## Updating the Prism bindings
+
+When updating Prism, set the version and SHA-256 of its official Go release
+archive in `scripts/update-prism-bindings.sh`, run the script, and commit the
+generated `prism/` files. Run the script with `--check` to compare the tracked
+files with the verified archive. Builds use the tracked files directly.
 
 ## Resources
 

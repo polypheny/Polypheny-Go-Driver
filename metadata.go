@@ -3,7 +3,7 @@ package polypheny
 import (
 	"context"
 
-	"github.com/polypheny/Polypheny-Prism-API/go/v2/prism"
+	"github.com/polypheny/Polypheny-Go-Driver/prism"
 )
 
 // SearchEntities returns metadata about the entities in namespace. A nil pattern

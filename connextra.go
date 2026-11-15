@@ -3,7 +3,7 @@ package polypheny
 import (
 	"context"
 
-	"github.com/polypheny/Polypheny-Prism-API/go/v2/prism"
+	"github.com/polypheny/Polypheny-Go-Driver/prism"
 )
 
 // QueryMongoContext executes an MQL query and returns all documents in its

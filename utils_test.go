@@ -3,7 +3,7 @@ package polypheny
 import (
 	"testing"
 
-	prism "github.com/polypheny/Polypheny-Prism-API/go/v2/prism"
+	prism "github.com/polypheny/Polypheny-Go-Driver/prism"
 )
 
 func TestMakeProtoValue1(t *testing.T) {
