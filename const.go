@@ -1,7 +1,7 @@
 package polypheny
 
 import (
-	prism "github.com/polypheny/Polypheny-Go-Driver/prism"
+	prism "github.com/polypheny/Polypheny-Prism-API/go/v2/prism"
 )
 
 // Connection/API versions

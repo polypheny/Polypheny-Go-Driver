@@ -1,18 +1,21 @@
 package polypheny
 
 import (
-	context "context"
-	driver "database/sql/driver"
+	"context"
+	"database/sql/driver"
+	"fmt"
+	"sync/atomic"
+	"time"
 
-	prism "github.com/polypheny/Polypheny-Go-Driver/prism"
+	"github.com/polypheny/Polypheny-Prism-API/go/v2/prism"
 )
 
-// PreparedStatement implments Stmt, StmtExecContext and StmtQueryContext
-// Deprecated functions, such as Exec and Query, are also implemented for compatibility, but they are deprecated.
+// PreparedStatement implements driver.Stmt and its context-aware extensions.
 type PreparedStatement struct {
-	conn *PolyphenyConn
-	id   int32
-	args []ArgSpec
+	conn   *PolyphenyConn
+	id     int32
+	args   []ArgSpec
+	closed atomic.Bool
 }
 
 type ArgSpec struct {
@@ -23,184 +26,98 @@ type ArgSpec struct {
 	name          string
 }
 
-// Close closes the statement
+// Close releases the prepared statement on the server.
 func (stmt *PreparedStatement) Close() error {
-	request := prism.Request{
-		Type: &prism.Request_CloseStatementRequest{
-			CloseStatementRequest: &prism.CloseStatementRequest{
-				StatementId: stmt.id,
-			},
-		},
+	if !stmt.closed.CompareAndSwap(false, true) || !stmt.conn.IsValid() {
+		return nil
 	}
-	_, err := stmt.conn.helperSendAndRecv(&request)
-	return err
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := stmt.conn.closeStatement(ctx, stmt.id); err != nil {
+		_ = stmt.conn.close()
+		return err
+	}
+	return nil
 }
 
-// NumInput returns the number of parameters
+func (stmt *PreparedStatement) recordCloseError(operationErr *error) {
+	if err := stmt.Close(); *operationErr == nil {
+		*operationErr = err
+	}
+}
+
+// NumInput returns the number of positional parameters.
 func (stmt *PreparedStatement) NumInput() int {
 	return len(stmt.args)
 }
 
-// Exec executes a query that doesn't return data
-// TODO: add support to FetchSize
-// Deprecated
+// Exec executes a prepared statement.
 func (stmt *PreparedStatement) Exec(args []driver.Value) (driver.Result, error) {
-	pvs, err := helperConvertValueToProto(args)
+	return stmt.ExecContext(context.Background(), namedValues(args))
+}
+
+// ExecContext executes a prepared statement with the supplied parameters.
+func (stmt *PreparedStatement) ExecContext(ctx context.Context, args []driver.NamedValue) (result driver.Result, err error) {
+	values, err := stmt.parameters(args)
 	if err != nil {
 		return nil, err
 	}
-	request := prism.Request{
-		Type: &prism.Request_ExecuteIndexedStatementRequest{
-			ExecuteIndexedStatementRequest: &prism.ExecuteIndexedStatementRequest{
-				StatementId: stmt.id,
-				Parameters: &prism.IndexedParameters{
-					Parameters: pvs,
-				},
-				FetchSize: nil,
-			},
-		},
-	}
-	response, err := stmt.conn.helperSendAndRecv(&request)
+	response, err := stmt.execute(ctx, values)
 	if err != nil {
+		defer stmt.conn.finishStatement(stmt.id, false, false, &err)
 		return nil, err
 	}
-	return helperExtractResultFromStatementResult(response.GetStatementResult())
+	if response.GetFrame() != nil {
+		defer stmt.conn.finishStatement(stmt.id, false, !response.GetFrame().GetIsLast(), &err)
+	}
+	return helperExtractResultFromStatementResult(response)
 }
 
-func (stmt *PreparedStatement) execContextInternal(args []driver.NamedValue, resultChan chan *PolyphenyResult, errChan chan error) {
-	pvs, err := helperConvertNamedvalueToProto(args)
-	if err != nil {
-		resultChan <- nil
-		errChan <- err
-		return
-	}
-	request := prism.Request{
-		Type: &prism.Request_ExecuteIndexedStatementRequest{
-			ExecuteIndexedStatementRequest: &prism.ExecuteIndexedStatementRequest{
-				StatementId: stmt.id,
-				Parameters: &prism.IndexedParameters{
-					Parameters: pvs,
-				},
-				FetchSize: nil,
-			},
-		},
-	}
-	response, err := stmt.conn.helperSendAndRecv(&request)
-	if err != nil {
-		resultChan <- nil
-		errChan <- err
-		return
-	}
-	result, err := helperExtractResultFromStatementResult(response.GetStatementResult())
-	if err != nil {
-		resultChan <- nil
-		errChan <- err
-		return
-	} else {
-		resultChan <- result.(*PolyphenyResult)
-		errChan <- err
-		return
-	}
-}
-
-// ExecContext executes a query that doesn't return data under Context
-//
-// TODO add fetch size, namespace and args support.
-// TODO for args support, can we first prepare it and then exec?
-func (stmt *PreparedStatement) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
-	errChan := make(chan error)
-	resultChan := make(chan *PolyphenyResult)
-	var err error
-	var result *PolyphenyResult
-	go stmt.execContextInternal(args, resultChan, errChan)
-	select {
-	case <-ctx.Done():
-		// context timeout or cancelled
-		return nil, ctx.Err()
-	case result = <-resultChan:
-		err = <-errChan
-		return result, err
-	}
-}
-
-// Query executes a query that returns data
-// TODO: add support to FetchSize
-// Deprecated
+// Query executes a prepared query.
 func (stmt *PreparedStatement) Query(args []driver.Value) (driver.Rows, error) {
-	pvs, err := helperConvertValueToProto(args)
+	return stmt.QueryContext(context.Background(), namedValues(args))
+}
+
+// QueryContext executes a prepared query with the supplied parameters.
+func (stmt *PreparedStatement) QueryContext(ctx context.Context, args []driver.NamedValue) (rows driver.Rows, err error) {
+	values, err := stmt.parameters(args)
 	if err != nil {
 		return nil, err
 	}
-	request := prism.Request{
-		Type: &prism.Request_ExecuteIndexedStatementRequest{
-			ExecuteIndexedStatementRequest: &prism.ExecuteIndexedStatementRequest{
-				StatementId: stmt.id,
-				Parameters: &prism.IndexedParameters{
-					Parameters: pvs,
-				},
-				FetchSize: nil,
-			},
-		},
-	}
-	response, err := stmt.conn.helperSendAndRecv(&request)
+	response, err := stmt.execute(ctx, values)
+	paginated := response.GetFrame() != nil && !response.GetFrame().GetIsLast()
+	defer stmt.conn.finishStatement(stmt.id, false, paginated, &err)
 	if err != nil {
 		return nil, err
 	}
-	return helperExtractRowsFromStatementResult(response.GetStatementResult())
+	return stmt.conn.readRows(ctx, stmt.id, response.GetFrame())
 }
 
-func (stmt *PreparedStatement) queryContextInternal(args []driver.NamedValue, rowsChan chan *PolyphenyRows, errChan chan error) {
-	pvs, err := helperConvertNamedvalueToProto(args)
-	if err != nil {
-		rowsChan <- nil
-		errChan <- err
-		return
+func (stmt *PreparedStatement) parameters(args []driver.NamedValue) ([]*prism.ProtoValue, error) {
+	if stmt.closed.Load() {
+		return nil, &ClientError{message: "the prepared statement is closed"}
 	}
-	request := prism.Request{
+	if len(args) != stmt.NumInput() {
+		return nil, &ClientError{message: fmt.Sprintf("expected %d SQL arguments, got %d", stmt.NumInput(), len(args))}
+	}
+	return helperConvertNamedvalueToProto(args)
+}
+
+func (stmt *PreparedStatement) execute(ctx context.Context, values []*prism.ProtoValue) (*prism.StatementResult, error) {
+	response, err := stmt.conn.call(ctx, &prism.Request{
 		Type: &prism.Request_ExecuteIndexedStatementRequest{
 			ExecuteIndexedStatementRequest: &prism.ExecuteIndexedStatementRequest{
 				StatementId: stmt.id,
-				Parameters: &prism.IndexedParameters{
-					Parameters: pvs,
-				},
-				FetchSize: nil,
+				Parameters:  &prism.IndexedParameters{Parameters: values},
 			},
 		},
-	}
-	response, err := stmt.conn.helperSendAndRecv(&request)
+	})
 	if err != nil {
-		rowsChan <- nil
-		errChan <- err
-		return
+		return nil, err
 	}
-	result, err := helperExtractRowsFromStatementResult(response.GetStatementResult())
-	if err != nil {
-		rowsChan <- nil
-		errChan <- err
-		return
-	} else {
-		rowsChan <- result.(*PolyphenyRows)
-		errChan <- err
-		return
+	result := response.GetStatementResult()
+	if result == nil {
+		return nil, &ClientError{message: "Prism server did not return a prepared statement result"}
 	}
-}
-
-// QueryContext executes a query that returns data under Context
-//
-// TODO add fetch size, namespace and args support.
-// TODO for args support, can we first prepare it and then exec?
-func (stmt *PreparedStatement) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
-	errChan := make(chan error)
-	rowsChan := make(chan *PolyphenyRows)
-	var err error
-	var result *PolyphenyRows
-	go stmt.queryContextInternal(args, rowsChan, errChan)
-	select {
-	case <-ctx.Done():
-		// context timeout or cancelled
-		return nil, ctx.Err()
-	case result = <-rowsChan:
-		err = <-errChan
-		return result, err
-	}
+	return result, nil
 }

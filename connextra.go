@@ -1,94 +1,45 @@
-// connextra defines extra functions which are not part of the sql/driver interface
-// Document queroes and graph queries(not supported yet) will call these functions
 package polypheny
 
 import (
-	context "context"
+	"context"
 
-	prism "github.com/polypheny/Polypheny-Go-Driver/prism"
-	proto "google.golang.org/protobuf/proto"
+	"github.com/polypheny/Polypheny-Prism-API/go/v2/prism"
 )
 
-func (conn *PolyphenyConn) queryMongoContextInternal(query string, resultChan chan *[]map[any]any, errChan chan error) {
-	request := prism.Request{
-		Type: &prism.Request_ExecuteUnparameterizedStatementRequest{
-			ExecuteUnparameterizedStatementRequest: &prism.ExecuteUnparameterizedStatementRequest{
-				LanguageName:  "mongo",
-				Statement:     query,
-				FetchSize:     nil,
-				NamespaceName: nil,
-			},
-		},
+// QueryMongoContext executes an MQL query and returns all documents in its
+// result. Document keys are strings. Nested documents are maps with string
+// keys, and lists are slices of values.
+func (conn *PolyphenyConn) QueryMongoContext(ctx context.Context, query string) (rows *[]map[any]any, err error) {
+	statementID, result, err := conn.execute(ctx, "mongo", query, nil)
+	paginated := result.GetFrame() != nil && !result.GetFrame().GetIsLast()
+	if statementID != 0 {
+		defer conn.finishStatement(statementID, true, paginated, &err)
 	}
-	response, err := conn.helperSendAndRecv(&request)
 	if err != nil {
-		resultChan <- nil
-		errChan <- err
-		return
+		return nil, err
 	}
-	requestID := response.GetStatementResponse().GetStatementId()
-	buf, err := conn.recv(8) // this is the query result
-	if err != nil {
-		resultChan <- nil
-		errChan <- err
-		return
-	}
-	err = proto.Unmarshal(buf, response)
-	if err != nil {
-		resultChan <- nil
-		errChan <- err
-		return
-	}
-	// is this an error?
-	if requestID != response.GetStatementResponse().GetStatementId() {
-		resultChan <- nil
-		errChan <- nil
-		return
-	}
-	if response.GetStatementResponse().GetResult().GetFrame() == nil || response.GetStatementResponse().GetResult().GetFrame().GetDocumentFrame() == nil {
-		resultChan <- nil
-		errChan <- &ClientError{
-			message: "Query should return document data, however the result is empty",
-		}
-	}
-	documentData := response.GetStatementResponse().GetResult().GetFrame().GetDocumentFrame().GetDocuments()
-	result := make([]map[any]any, len(documentData))
-	var currentRow map[any]any
-	for i, entries := range documentData {
-		currentRow = make(map[any]any)
-		for _, v := range entries.GetEntries() {
-			key, err := convertProtoValue(v.GetKey())
-			if err != nil {
-				resultChan <- nil
-				errChan <- err
-				return
-			}
-			value, err := convertProtoValue(v.GetValue())
-			if err != nil {
-				resultChan <- nil
-				errChan <- err
-				return
-			}
-			currentRow[key] = value
-		}
-		result[i] = currentRow
-	}
-	resultChan <- &result
-	errChan <- nil
-}
 
-func (conn *PolyphenyConn) QueryMongoContext(ctx context.Context, query string) (*[]map[any]any, error) {
-	errChan := make(chan error)
-	rowsChan := make(chan *[]map[any]any)
-	var err error
-	var result *[]map[any]any
-	go conn.queryMongoContextInternal(query, rowsChan, errChan)
-	select {
-	case <-ctx.Done():
-		// context timeout or cancelled
-		return nil, ctx.Err()
-	case result = <-rowsChan:
-		err = <-errChan
-		return result, err
+	documents := make([]map[any]any, 0)
+	err = conn.readFrames(ctx, statementID, result.GetFrame(), func(frame *prism.Frame) error {
+		documentFrame := frame.GetDocumentFrame()
+		if documentFrame == nil {
+			return &ClientError{message: "Prism server did not return a document result"}
+		}
+		for _, document := range documentFrame.GetDocuments() {
+			result, err := convertDocument(document)
+			if err != nil {
+				return err
+			}
+			row := make(map[any]any, len(result))
+			for key, value := range result {
+				row[key] = value
+			}
+			documents = append(documents, row)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
+	return &documents, nil
 }

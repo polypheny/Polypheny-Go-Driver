@@ -1,0 +1,78 @@
+name: Go driver checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: Go ${{ matrix.go }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        go: ['1.23.x', stable]
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+      - run: go mod download
+      - run: go mod verify
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  integration:
+    name: Prism 2.2 integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - uses: actions/checkout@v4
+        with:
+          repository: polypheny/Polypheny-DB
+          ref: 3a9d8db78c39a6a7cc5ce57fcd248c6cdaa62a36
+          path: polypheny-db
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build the Prism 2.2 server
+        working-directory: polypheny-db
+        run: |
+          ./gradlew :dbms:shadowJar assemblePlugins -PwithoutpullingUi=true --console=plain
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+          import zipfile
+
+          jars = [path for path in Path('dbms/build/libs').glob('dbms-*.jar')
+                  if not path.stem.endswith(('-tests', '-sources', '-javadoc'))]
+          assert len(jars) == 1, f'Expected one executable server JAR, found {jars}'
+          with zipfile.ZipFile(jars[0]) as jar:
+              assert 'org/slf4j/Logger.class' in jar.namelist(), 'Server JAR is missing runtime dependencies'
+          shutil.copyfile(jars[0], '../polypheny.jar')
+          PY
+      - name: Run live driver integration tests
+        uses: polypheny/GitHub-Action-Run-Polypheny@v0.2.0
+        env:
+          POLYPHENY_TEST_DSN: 'localhost:20590,pa:'
+        with:
+          cmd: go test -v -count=1 -run '^TestIntegration' .
+          jar: polypheny.jar
+          autodocker: false

@@ -1,8 +1,9 @@
 package polypheny
 
 import (
-	prism "github.com/polypheny/Polypheny-Go-Driver/prism"
 	"testing"
+
+	prism "github.com/polypheny/Polypheny-Prism-API/go/v2/prism"
 )
 
 func TestMakeProtoValue1(t *testing.T) {
@@ -54,28 +55,28 @@ func TestConvertProtoValue(t *testing.T) {
 	if result.(bool) != expected {
 		t.Errorf("Failed to convert, expected %v, but got %v", expected, result)
 	}
-        expected = int32(1)
-        protoValue, _ = makeProtoValue(expected)
-        result, _ = convertProtoValue(protoValue)
-        if result.(int32) != expected {
-                t.Errorf("Failed to convert, expected %v, but got %v", expected, result)
-        }
-        expected = int64(1000000000000)
-        protoValue, _ = makeProtoValue(expected)
-        result, _ = convertProtoValue(protoValue)
-        if result.(int64) != expected {
-                t.Errorf("Failed to convert, expected %v, but got %v", expected, result)
-        }
-        expected = float32(1.2)
-        protoValue, _ = makeProtoValue(expected)
-        result, _ = convertProtoValue(protoValue)
-        if result.(float32) != expected {
-                t.Errorf("Failed to convert, expected %v, but got %v", expected, result)
-        }
-        expected = float64(1.2)
-        protoValue, _ = makeProtoValue(expected)
-        result, _ = convertProtoValue(protoValue)
-        if result.(float64) != expected {
-                t.Errorf("Failed to convert, expected %v, but got %v", expected, result)
-        }
+	expected = int32(1)
+	protoValue, _ = makeProtoValue(expected)
+	result, _ = convertProtoValue(protoValue)
+	if result.(int32) != expected {
+		t.Errorf("Failed to convert, expected %v, but got %v", expected, result)
+	}
+	expected = int64(1000000000000)
+	protoValue, _ = makeProtoValue(expected)
+	result, _ = convertProtoValue(protoValue)
+	if result.(int64) != expected {
+		t.Errorf("Failed to convert, expected %v, but got %v", expected, result)
+	}
+	expected = float32(1.2)
+	protoValue, _ = makeProtoValue(expected)
+	result, _ = convertProtoValue(protoValue)
+	if result.(float32) != expected {
+		t.Errorf("Failed to convert, expected %v, but got %v", expected, result)
+	}
+	expected = float64(1.2)
+	protoValue, _ = makeProtoValue(expected)
+	result, _ = convertProtoValue(protoValue)
+	if result.(float64) != expected {
+		t.Errorf("Failed to convert, expected %v, but got %v", expected, result)
+	}
 }
