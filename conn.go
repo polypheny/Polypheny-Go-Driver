@@ -1,88 +1,94 @@
 package polypheny
 
 import (
-	context "context"
+	"context"
 	"database/sql/driver"
-	binary "encoding/binary"
-	math "math"
-	net "net"
-	atomic "sync/atomic"
+	"encoding/binary"
+	"fmt"
+	"io"
+	"net"
+	"sync"
+	"sync/atomic"
+	"time"
 
-	prism "github.com/polypheny/Polypheny-Go-Driver/prism"
-
-	proto "google.golang.org/protobuf/proto"
+	"github.com/polypheny/Polypheny-Prism-API/go/v2/prism"
+	"google.golang.org/protobuf/proto"
 )
 
-// PolyphenyConn implements driver.Conn
+// The 8-byte length prefix can represent more than we can safely allocate.
+const maxFrameSize = 256 << 20
+
+// PolyphenyConn implements driver.Conn.
 type PolyphenyConn struct {
-	address     string       // addr:port
-	username    string       // username is stored, but password is not
-	netConn     net.Conn     // the Conn struct returned by Dial
-	isConnected atomic.Int32 // Connection status
+	address     string
+	username    string
+	netConn     net.Conn
+	isConnected atomic.Int32
+	inTx        atomic.Bool
+
+	mu            sync.Mutex
+	nextRequestID uint64
 }
 
-// IsValid implements Validator interface
+// IsValid reports whether the connection can be reused by database/sql.
 func (conn *PolyphenyConn) IsValid() bool {
-	// don't think its necessary to do a connection check here
 	return conn.isConnected.Load() == statusPolyphenyConnected
 }
 
-// ping pings a connection and sending the result via the error channel
-func (conn *PolyphenyConn) pingInternal(err chan error) {
-	status := conn.isConnected.Load()
-	if status == statusDisconnected {
-		err <- driver.ErrBadConn
-	} else if status == statusServerConnected {
-		err <- &ClientError{
-			message: "Ping: invalid connection to Polypheny server",
-		}
-	}
-	request := prism.Request{
-		Type: &prism.Request_ConnectionCheckRequest{
-			ConnectionCheckRequest: &prism.ConnectionCheckRequest{},
-		},
-	}
-	_, connErr := conn.helperSendAndRecv(&request)
-	if connErr != nil {
-		err <- driver.ErrBadConn
-	}
-	err <- nil
-}
-
-// Ping implmenets Pinger
+// Ping checks that the server responds on this connection.
 func (conn *PolyphenyConn) Ping(ctx context.Context) error {
-	errChan := make(chan error)
-	go conn.pingInternal(errChan)
-	var err error
-	select {
-	case <-ctx.Done():
-		// context timeout or cancelled
-		// TODO: or we return ErrBadConn?
-		return &ClientError{
-			message: "Context cancelled or timeout",
-		}
-	case err = <-errChan:
+	response, err := conn.call(ctx, &prism.Request{
+		Type: &prism.Request_ConnectionCheckRequest{ConnectionCheckRequest: &prism.ConnectionCheckRequest{}},
+	})
+	if err != nil {
 		return err
 	}
+	if response.GetConnectionCheckResponse() == nil {
+		return &ClientError{message: "Prism server did not acknowledge the connection check"}
+	}
+	return nil
 }
 
-// Prepare a statement
+// Prepare prepares a SQL statement on the server.
 func (conn *PolyphenyConn) Prepare(query string) (driver.Stmt, error) {
-	request := prism.Request{
+	return conn.PrepareContext(context.Background(), query)
+}
+
+// PrepareContext prepares a SQL statement with positional parameters.
+func (conn *PolyphenyConn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
+	return conn.prepare(ctx, query)
+}
+
+func (conn *PolyphenyConn) prepare(ctx context.Context, query string) (*PreparedStatement, error) {
+	response, err := conn.call(ctx, &prism.Request{
 		Type: &prism.Request_PrepareIndexedStatementRequest{
 			PrepareIndexedStatementRequest: &prism.PrepareStatementRequest{
-				LanguageName:  "sql",
-				Statement:     query,
-				NamespaceName: nil,
+				LanguageName: "sql",
+				Statement:    query,
 			},
 		},
-	}
-	response, err := conn.helperSendAndRecv(&request)
+	})
 	if err != nil {
+		if ctx.Err() == nil {
+			conn.finishStatement(0, true, false, &err)
+		}
 		return nil, err
 	}
-	var args []ArgSpec
-	for _, parameter := range response.GetPreparedStatementSignature().GetParameterMetas() {
+	signature := response.GetPreparedStatementSignature()
+	if signature == nil {
+		_ = conn.close()
+		return nil, &ClientError{message: "Prism server did not return a prepared statement signature"}
+	}
+	if !conn.inTx.Load() {
+		// Prism validates prepared SQL in a transaction even in auto-commit mode.
+		// The prepared statement remains available after that transaction ends.
+		if err := conn.endTransaction(ctx, true); err != nil {
+			_ = conn.close()
+			return nil, err
+		}
+	}
+	args := make([]ArgSpec, 0, len(signature.GetParameterMetas()))
+	for _, parameter := range signature.GetParameterMetas() {
 		args = append(args, ArgSpec{
 			precision:     parameter.GetPrecision(),
 			scale:         parameter.GetScale(),
@@ -91,344 +97,334 @@ func (conn *PolyphenyConn) Prepare(query string) (driver.Stmt, error) {
 			name:          parameter.GetName(),
 		})
 	}
-	return &PreparedStatement{
-		conn: conn,
-		id:   response.GetPreparedStatementSignature().GetStatementId(),
-		args: args,
-	}, nil
+	return &PreparedStatement{conn: conn, id: signature.GetStatementId(), args: args}, nil
 }
 
-// Close will close the network connection to Polypheny server
-// TODO: add support to timeout
+// Close disconnects from the server and releases the network connection.
 func (conn *PolyphenyConn) Close() error {
-	request := prism.Request{
-		Type: &prism.Request_DisconnectRequest{
-			DisconnectRequest: &prism.DisconnectRequest{},
-		},
+	if !conn.IsValid() {
+		return conn.close()
 	}
-	_, err := conn.helperSendAndRecv(&request)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := conn.call(ctx, &prism.Request{
+		Type: &prism.Request_DisconnectRequest{DisconnectRequest: &prism.DisconnectRequest{}},
+	})
+	closeErr := conn.close()
 	if err != nil {
 		return err
 	}
-	conn.isConnected.Store(statusServerConnected)
-	err = conn.close()
-	return err
+	return closeErr
 }
 
-// Begin starts a new transaction
-// TODO: add support to ConnBeginTx
-// Deprecated
+// Begin starts a transaction.
 func (conn *PolyphenyConn) Begin() (driver.Tx, error) {
-	return &PolyphenyTransaction{
-		conn: conn,
-	}, nil
+	return conn.BeginTx(context.Background(), driver.TxOptions{})
 }
 
-// BeginTx starts a transaction
+// BeginTx starts a transaction with the server's default isolation level.
 func (conn *PolyphenyConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-		return &PolyphenyTransaction{
-			conn: conn,
-		}, nil
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
+	if opts.Isolation != 0 || opts.ReadOnly {
+		return nil, &ClientError{message: "Polypheny supports only the default transaction options"}
+	}
+	if !conn.inTx.CompareAndSwap(false, true) {
+		return nil, &ClientError{message: "a transaction is already active"}
+	}
+	if err := conn.setAutoCommit(ctx, false); err != nil {
+		conn.inTx.Store(false)
+		return nil, err
+	}
+	return &PolyphenyTransaction{conn: conn}, nil
 }
 
-// Exec executes a query that doesn't return data
-// TODO: add fetch size, namespace and args support.
-// TODO: for args support, can we first prepare it and then exec?
-// Deprecated
+// Exec executes a SQL statement.
 func (conn *PolyphenyConn) Exec(query string, args []driver.Value) (driver.Result, error) {
-	request := prism.Request{
-		Type: &prism.Request_ExecuteUnparameterizedStatementRequest{
-			ExecuteUnparameterizedStatementRequest: &prism.ExecuteUnparameterizedStatementRequest{
-				LanguageName:  "sql",
-				Statement:     query,
-				FetchSize:     nil,
-				NamespaceName: nil,
-			},
-		},
+	return conn.ExecContext(context.Background(), query, namedValues(args))
+}
+
+// ExecContext executes a SQL statement with positional arguments.
+func (conn *PolyphenyConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (result driver.Result, err error) {
+	if len(args) != 0 {
+		statement, prepareErr := conn.prepare(ctx, query)
+		if prepareErr != nil {
+			return nil, prepareErr
+		}
+		defer statement.recordCloseError(&err)
+		return statement.ExecContext(ctx, args)
 	}
-	response, err := conn.helperSendAndRecv(&request)
+	statementID, statementResult, err := conn.execute(ctx, "sql", query, nil)
+	if statementID != 0 {
+		defer conn.finishStatement(statementID, true, false, &err)
+	}
 	if err != nil {
 		return nil, err
 	}
-	requestID := response.GetStatementResponse().GetStatementId()
-	buf, err := conn.recv(8) // this is the query result
-	if err != nil {
-		return nil, err
-	}
-	err = proto.Unmarshal(buf, response)
-	if err != nil {
-		return nil, err
-	}
-	// is this an error?
-	if requestID != response.GetStatementResponse().GetStatementId() {
-		return nil, nil
-	}
-	return helperExtractResultFromStatementResult(response.GetStatementResponse().GetResult())
+	return helperExtractResultFromStatementResult(statementResult)
 }
 
-// execContextInternal is called by ExecContext, if the ctx is timeout or cancelled, ExecContext will return without waiting execContextInternal
-//
-// TODO add args support
-func (conn *PolyphenyConn) execContextInternal(query string, resultChan chan *PolyphenyResult, errChan chan error) {
-	request := prism.Request{
-		Type: &prism.Request_ExecuteUnparameterizedStatementRequest{
-			ExecuteUnparameterizedStatementRequest: &prism.ExecuteUnparameterizedStatementRequest{
-				LanguageName:  "sql",
-				Statement:     query,
-				FetchSize:     nil,
-				NamespaceName: nil,
-			},
-		},
-	}
-	response, err := conn.helperSendAndRecv(&request)
-	if err != nil {
-		resultChan <- nil
-		errChan <- err
-		return
-	}
-	requestID := response.GetStatementResponse().GetStatementId()
-	buf, err := conn.recv(8) // this is the query result
-	if err != nil {
-		resultChan <- nil
-		errChan <- err
-		return
-	}
-	err = proto.Unmarshal(buf, response)
-	if err != nil {
-		resultChan <- nil
-		errChan <- err
-		return
-	}
-	// is this an error?
-	if requestID != response.GetStatementResponse().GetStatementId() {
-		resultChan <- nil
-		errChan <- nil
-		return
-	}
-	result, err := helperExtractResultFromStatementResult(response.GetStatementResponse().GetResult())
-	if err != nil {
-		resultChan <- nil
-		errChan <- err
-		return
-	} else {
-		resultChan <- result.(*PolyphenyResult)
-		errChan <- err
-		return
-	}
-}
-
-// ExecContext executes a query that doesn't return data under Context
-//
-// TODO add fetch size, namespace and args support.
-// TODO for args support, can we first prepare it and then exec?
-func (conn *PolyphenyConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
-	errChan := make(chan error)
-	resultChan := make(chan *PolyphenyResult)
-	var err error
-	var result *PolyphenyResult
-	go conn.execContextInternal(query, resultChan, errChan)
-	select {
-	case <-ctx.Done():
-		// context timeout or cancelled
-		return nil, ctx.Err()
-	case result = <-resultChan:
-		err = <-errChan
-		return result, err
-	}
-}
-
-// Exec executes a query that returns data
-// TODO: add fetch size, namespace and args support.
-// TODO: for args support, can we first prepare it and then exec?
-// Deprecated
+// Query executes a SQL query.
 func (conn *PolyphenyConn) Query(query string, args []driver.Value) (driver.Rows, error) {
-	request := prism.Request{
+	return conn.QueryContext(context.Background(), query, namedValues(args))
+}
+
+// QueryContext executes a SQL query with positional arguments.
+func (conn *PolyphenyConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (rows driver.Rows, err error) {
+	if len(args) != 0 {
+		statement, prepareErr := conn.prepare(ctx, query)
+		if prepareErr != nil {
+			return nil, prepareErr
+		}
+		defer statement.recordCloseError(&err)
+		return statement.QueryContext(ctx, args)
+	}
+	statementID, result, err := conn.execute(ctx, "sql", query, nil)
+	paginated := result.GetFrame() != nil && !result.GetFrame().GetIsLast()
+	if statementID != 0 {
+		defer conn.finishStatement(statementID, true, paginated, &err)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return conn.readRows(ctx, statementID, result.GetFrame())
+}
+
+// execute receives the statement ID followed by the statement result in one
+// exchange, so a second request cannot consume either message.
+func (conn *PolyphenyConn) execute(ctx context.Context, language, query string, namespace *string) (int32, *prism.StatementResult, error) {
+	responses, err := conn.exchange(ctx, &prism.Request{
 		Type: &prism.Request_ExecuteUnparameterizedStatementRequest{
 			ExecuteUnparameterizedStatementRequest: &prism.ExecuteUnparameterizedStatementRequest{
-				LanguageName:  "sql",
+				LanguageName:  language,
 				Statement:     query,
-				FetchSize:     nil,
-				NamespaceName: nil,
+				NamespaceName: namespace,
 			},
 		},
+	})
+	var statementID int32
+	if len(responses) > 0 {
+		statementID = responses[0].GetStatementResponse().GetStatementId()
 	}
-	response, err := conn.helperSendAndRecv(&request)
 	if err != nil {
-		return nil, err
+		if statementID == 0 && ctx.Err() == nil {
+			conn.finishStatement(0, true, false, &err)
+		}
+		return statementID, nil, err
 	}
-	requestID := response.GetStatementResponse().GetStatementId()
-	buf, err := conn.recv(8) // this is the query result
-	if err != nil {
-		return nil, err
+	last := responses[len(responses)-1].GetStatementResponse()
+	if last == nil || statementID <= 0 || last.GetStatementId() != statementID || last.GetResult() == nil {
+		_ = conn.close()
+		return statementID, nil, &ClientError{message: "Prism server returned an invalid statement response"}
 	}
-	err = proto.Unmarshal(buf, response)
-	if err != nil {
-		return nil, err
-	}
-	// is this an error?
-	if requestID != response.GetStatementResponse().GetStatementId() {
-		return nil, nil
-	}
-	return helperExtractRowsFromStatementResult(response.GetStatementResponse().GetResult())
+	return statementID, last.GetResult(), nil
 }
 
-// queryContextInternal is called by QueryContext, if the ctx is timeout or cancelled, QueryContext will return without waiting queryContextInternal
-//
-// TODO add args support
-func (conn *PolyphenyConn) queryContextInternal(query string, rowsChan chan *PolyphenyRows, errChan chan error) {
-	request := prism.Request{
-		Type: &prism.Request_ExecuteUnparameterizedStatementRequest{
-			ExecuteUnparameterizedStatementRequest: &prism.ExecuteUnparameterizedStatementRequest{
-				LanguageName:  "sql",
-				Statement:     query,
-				FetchSize:     nil,
-				NamespaceName: nil,
-			},
+func (conn *PolyphenyConn) fetch(ctx context.Context, statementID int32) (*prism.Frame, error) {
+	response, err := conn.call(ctx, &prism.Request{
+		Type: &prism.Request_FetchRequest{
+			FetchRequest: &prism.FetchRequest{StatementId: statementID},
 		},
-	}
-	response, err := conn.helperSendAndRecv(&request)
+	})
 	if err != nil {
-		rowsChan <- nil
-		errChan <- err
-		return
+		return nil, err
 	}
-	requestID := response.GetStatementResponse().GetStatementId()
-	buf, err := conn.recv(8) // this is the query result
-	if err != nil {
-		rowsChan <- nil
-		errChan <- err
-		return
+	frame := response.GetFrame()
+	if frame == nil {
+		return nil, &ClientError{message: "Prism server did not return the next result frame"}
 	}
-	err = proto.Unmarshal(buf, response)
-	if err != nil {
-		rowsChan <- nil
-		errChan <- err
-		return
-	}
-	// is this an error?
-	if requestID != response.GetStatementResponse().GetStatementId() {
-		rowsChan <- nil
-		errChan <- nil
-		return
-	}
-	result, err := helperExtractRowsFromStatementResult(response.GetStatementResponse().GetResult())
-	if err != nil {
-		rowsChan <- nil
-		errChan <- err
-		return
-	} else {
-		rowsChan <- result.(*PolyphenyRows)
-		errChan <- err
-		return
-	}
+	return frame, nil
 }
 
-// QueryContext executes a query that returns data under Context
-//
-// TODO add fetch size, namespace and args support.
-// TODO for args support, can we first prepare it and then exec?
-func (conn *PolyphenyConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
-	errChan := make(chan error)
-	rowsChan := make(chan *PolyphenyRows)
-	var err error
-	var result *PolyphenyRows
-	go conn.queryContextInternal(query, rowsChan, errChan)
-	select {
-	case <-ctx.Done():
-		// context timeout or cancelled
-		return nil, ctx.Err()
-	case result = <-rowsChan:
-		err = <-errChan
-		return result, err
-	}
-}
-
-// Many requests to the server have a similar pattern
-// Client first sends the length of the message, and then the message itself
-// TODO: Currently only little endian is supported
-func (conn *PolyphenyConn) send(serialized []byte, lengthSize int) error {
-	if lengthSize > 8 {
-		return &ClientError{
-			message: "PolyphenyConn.send() expects the lengthSize parameter is not greater than 8",
-		}
-	}
-	lengthBuf := make([]byte, 8)
-	length := make([]byte, lengthSize)
-	lenSerialized := len(serialized)
-	if uint64(lenSerialized) >= uint64(math.Pow(2, float64(lengthSize*8-1))) {
-		return &ClientError{
-			message: "PolyphenyConn.send(): the size of the serialized message is too large to be put in a byte array of size lengthSize",
-		}
-	}
-	binary.LittleEndian.PutUint64(lengthBuf, uint64(lenSerialized))
-	for i := range length {
-		length[i] = lengthBuf[i]
-	}
-	_, err := conn.netConn.Write(length)
-	if err != nil {
-		return nil
-	}
-	_, err = conn.netConn.Write(serialized)
+func (conn *PolyphenyConn) closeStatement(ctx context.Context, statementID int32) error {
+	_, err := conn.call(ctx, &prism.Request{
+		Type: &prism.Request_CloseStatementRequest{
+			CloseStatementRequest: &prism.CloseStatementRequest{StatementId: statementID},
+		},
+	})
 	return err
 }
 
-// Many responses from the server also have a similar pattern
-// Server first sends the length of a message and then the message itself
-// TODO: Currently only little endian is supported
-func (conn *PolyphenyConn) recv(lengthSize int) ([]byte, error) {
-	if lengthSize > 8 {
-		return nil, &ClientError{
-			message: "PolyphenyConn.recv() expects the lengthSize parameter is not greater than 8",
+func (conn *PolyphenyConn) finishStatement(statementID int32, temporary, paginated bool, operationErr *error) {
+	if !conn.IsValid() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var err error
+	if statementID != 0 {
+		if temporary {
+			err = conn.closeStatement(ctx, statementID)
+		} else {
+			_, err = conn.call(ctx, &prism.Request{
+				Type: &prism.Request_CloseResultRequest{
+					CloseResultRequest: &prism.CloseResultRequest{StatementId: statementID},
+				},
+			})
+		}
+		if err != nil {
+			if *operationErr == nil {
+				*operationErr = err
+			}
+			_ = conn.close()
+			return
 		}
 	}
-	lengthBuf := make([]byte, 8)
-	length := make([]byte, lengthSize)
-	_, err := conn.netConn.Read(length)
-	if err != nil {
+	if conn.inTx.Load() || !conn.IsValid() {
+		return
+	}
+	if *operationErr != nil {
+		// Clear the implicit transaction left by a failed statement.
+		if err := conn.endTransaction(ctx, false); err != nil {
+			_ = conn.close()
+		}
+	} else if paginated {
+		// Prism auto-commits an initial final frame, but not subsequent fetches.
+		if err := conn.endTransaction(ctx, true); err != nil {
+			*operationErr = err
+			_ = conn.close()
+		}
+	}
+}
+
+func (conn *PolyphenyConn) send(serialized []byte, lengthSize int) error {
+	if lengthSize < 1 || lengthSize > 8 {
+		return &ClientError{message: "invalid Prism length field size"}
+	}
+	if len(serialized) > maxFrameSize || uint64(len(serialized)) >= 1<<uint(lengthSize*8-1) {
+		return &ClientError{message: "Prism message is too large"}
+	}
+	var length [8]byte
+	binary.LittleEndian.PutUint64(length[:], uint64(len(serialized)))
+	if err := writeAll(conn.netConn, length[:lengthSize]); err != nil {
+		return err
+	}
+	return writeAll(conn.netConn, serialized)
+}
+
+func writeAll(w io.Writer, data []byte) error {
+	for len(data) != 0 {
+		n, err := w.Write(data)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return io.ErrShortWrite
+		}
+		data = data[n:]
+	}
+	return nil
+}
+
+func (conn *PolyphenyConn) recv(lengthSize int) ([]byte, error) {
+	if lengthSize < 1 || lengthSize > 8 {
+		return nil, &ClientError{message: "invalid Prism length field size"}
+	}
+	var length [8]byte
+	if _, err := io.ReadFull(conn.netConn, length[:lengthSize]); err != nil {
 		return nil, err
 	}
-	for i := range lengthBuf {
-		if i < lengthSize {
-			lengthBuf[i] = length[i]
-		} else {
-			lengthBuf[i] = 0
-		}
+	n := binary.LittleEndian.Uint64(length[:])
+	if n > maxFrameSize || n >= 1<<uint(lengthSize*8-1) {
+		return nil, &ClientError{message: "Prism message is too large"}
 	}
-	recvLength := binary.LittleEndian.Uint64(lengthBuf)
-	buf := make([]byte, recvLength)
-	_, err = conn.netConn.Read(buf)
+	buf := make([]byte, n)
+	_, err := io.ReadFull(conn.netConn, buf)
 	return buf, err
 }
 
 func (conn *PolyphenyConn) close() error {
-	err := conn.netConn.Close()
-	if err != nil {
-		return err
+	if conn.isConnected.Swap(statusDisconnected) == statusDisconnected || conn.netConn == nil {
+		return nil
 	}
-	conn.isConnected.Store(statusDisconnected) //TODO: maybe add an error status
-	return nil
+	return conn.netConn.Close()
 }
 
-// helperSendAndRecv is a helper function which serialize and send a request, then returns the responses
-func (conn *PolyphenyConn) helperSendAndRecv(m proto.Message) (*prism.Response, error) {
-	buf, err := proto.Marshal(m)
+// withDeadline interrupts an in-flight exchange when the context is canceled.
+// A connection interrupted mid-frame cannot be safely returned to the pool.
+func (conn *PolyphenyConn) withDeadline(ctx context.Context, operation func() error) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if ctx.Done() == nil {
+		return operation()
+	}
+
+	interruptDone := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() {
+		_ = conn.netConn.SetDeadline(time.Now())
+		close(interruptDone)
+	})
+	err := operation()
+	if !stop() {
+		<-interruptDone
+		_ = conn.close()
+		return ctx.Err()
+	}
+	return err
+}
+
+func (conn *PolyphenyConn) exchange(ctx context.Context, request *prism.Request) ([]*prism.Response, error) {
+	conn.mu.Lock()
+	defer conn.mu.Unlock()
+	if conn.isConnected.Load() == statusDisconnected {
+		return nil, driver.ErrBadConn
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	conn.nextRequestID++
+	request.Id = conn.nextRequestID
+	buf, err := proto.Marshal(request)
 	if err != nil {
 		return nil, err
 	}
-	err = conn.send(buf, 8)
+	var responses []*prism.Response
+	err = conn.withDeadline(ctx, func() error {
+		if err := conn.send(buf, 8); err != nil {
+			_ = conn.close()
+			return err
+		}
+		for {
+			buf, err := conn.recv(8)
+			if err != nil {
+				_ = conn.close()
+				return err
+			}
+			response := new(prism.Response)
+			if err := proto.Unmarshal(buf, response); err != nil {
+				_ = conn.close()
+				return err
+			}
+			if response.GetId() != request.Id {
+				_ = conn.close()
+				return &ClientError{message: fmt.Sprintf("Prism response ID %d does not match request ID %d", response.GetId(), request.Id)}
+			}
+			if serverErr := response.GetErrorResponse(); serverErr != nil {
+				if !response.GetLast() {
+					_ = conn.close()
+				}
+				return &ClientError{message: serverErr.GetMessage()}
+			}
+			responses = append(responses, response)
+			if response.GetLast() {
+				return nil
+			}
+		}
+	})
+	return responses, err
+}
+
+func (conn *PolyphenyConn) call(ctx context.Context, request *prism.Request) (*prism.Response, error) {
+	responses, err := conn.exchange(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	buf, err = conn.recv(8)
-	if err != nil {
-		return nil, err
+	if len(responses) != 1 {
+		return nil, &ClientError{message: "Prism server returned multiple responses for a single-response request"}
 	}
-	var response prism.Response
-	err = proto.Unmarshal(buf, &response)
-	return &response, err
+	return responses[0], nil
 }

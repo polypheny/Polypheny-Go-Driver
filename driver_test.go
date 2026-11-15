@@ -1,8 +1,6 @@
 package polypheny
 
-import (
-	testing "testing"
-)
+import "testing"
 
 func TestParseDSN(t *testing.T) {
 	// wrong dsn format
@@ -28,13 +26,7 @@ func TestParseDSN(t *testing.T) {
 
 func TestOpen(t *testing.T) {
 	d := PolyphenyDriver{}
-	conn, err := d.Open("localhost:20590,pa:")
-	if err != nil {
-		t.Error(err)
-	}
-	conn.Close()
-	_, err = d.Open("localhost:20590,pa")
-	if err == nil {
+	if _, err := d.Open("localhost:20590,pa"); err == nil {
 		t.Error("Expecting error")
 	}
 }

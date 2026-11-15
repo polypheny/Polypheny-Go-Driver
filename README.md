@@ -1,45 +1,134 @@
 <p align="center">
-    <a href="https://polypheny.org/">
-        <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/polypheny/Admin/master/Logo/logo-white-text_cropped.png">
-            <img width='50%' alt="Light: 'Resume application project app icon' Dark: 'Resume application project app icon'" src="https://raw.githubusercontent.com/polypheny/Admin/master/Logo/logo-transparent_cropped.png">
-        </picture>
-    </a>    
-</p> 
+  <a href="https://polypheny.org/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/polypheny/Admin/master/Logo/logo-white-text_cropped.png">
+      <img width="50%" src="https://raw.githubusercontent.com/polypheny/Admin/master/Logo/logo-transparent_cropped.png" alt="Polypheny">
+    </picture>
+  </a>
+</p>
 
+# Polypheny Go Driver
 
-# Polypheny-DB Go Driver
-
-
-A Polypheny-DB Driver for the Go programming language which supports multiple models and query languages.
-
+Connect to Polypheny-DB from Go using `database/sql`. The driver supports SQL
+queries, positional parameters, and transactions. The raw connection provides
+MQL queries and Prism entity metadata.
 
 ## Installation
 
-To install and use the Go driver in a project, simply import this repo and the sql package of Go and then run *go mod tidy*. User may also need the context package.
+Use Go 1.23 or newer and a Polypheny server with a compatible Prism 2.x
+interface. The driver uses the released Prism 2.2 Go bindings as a Go module.
+Document collection metadata requires server-side Prism 2.2 support.
 
+```sh
+go get github.com/polypheny/Polypheny-Go-Driver
 ```
+
+## Querying with SQL
+
+The driver registers as `polypheny` and accepts
+`host:port,username:password` as its connection string. Prism uses port
+`20590` by default. The example assumes a local instance configured with
+the user `pa` and an empty password. The driver uses plain TCP, which does not
+encrypt credentials or query traffic. Connect through a trusted network or an
+encrypted tunnel.
+
+```go
+package main
+
 import (
-    _ "github.com/polypheny/Polypheny-Go-Driver"
-    "database/sql"
-    "context"
+	"context"
+	"database/sql"
+	"fmt"
+	"log"
+	"time"
+
+	_ "github.com/polypheny/Polypheny-Go-Driver"
 )
+
+func main() {
+	db, err := sql.Open("polypheny", "localhost:20590,pa:")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
+		log.Fatal(err)
+	}
+	var value int
+	if err := db.QueryRowContext(ctx, "SELECT 1").Scan(&value); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(value)
+}
 ```
 
-An in-depth and more detailed documentation can be found [here](https://docs.polypheny.com/en/latest/drivers/go/overview).
+Use `?` placeholders with `QueryContext`, `QueryRowContext`, and
+`ExecContext`, or prepare a statement with `PrepareContext`. For example,
+`db.QueryRowContext(ctx, "SELECT name FROM employees WHERE id = ?", 42)`
+queries an existing `employees` table. Statements outside an explicit
+transaction use auto-commit. Use `db.BeginTx(ctx, nil)` to group statements
+and call `Commit` or `Rollback` to finish the transaction.
 
+## MQL and entity metadata
 
+Import the driver as `polypheny` instead of the blank import and use
+`(*sql.Conn).Raw` to access driver-specific methods. The following example
+queries an existing `employees` collection or table in the default
+namespace, then lists the entities in `public`. Call
+`SearchEntities` with a pattern pointer to filter the results.
 
-## Roadmap
-See the [open issues](https://github.com/polypheny/Polypheny-DB/labels/A-golang) for a list of proposed features (and known issues).
+```go
+conn, err := db.Conn(ctx)
+if err != nil {
+	return err
+}
+defer conn.Close()
 
+return conn.Raw(func(raw any) error {
+	driverConn := raw.(*polypheny.PolyphenyConn)
+	documents, err := driverConn.QueryMongoContext(ctx, "db.employees.find()")
+	if err != nil {
+		return err
+	}
+	fmt.Println(*documents)
 
-## Contributing
-We highly welcome your contributions to the _Polypheny Go Driver_. If you would like to contribute, please fork the repository and submit your changes as a pull request. Please consult our [Admin Repository](https://github.com/polypheny/Admin) and our [Website](https://polypheny.org) for guidelines and additional information.
+	entities, err := driverConn.SearchEntities(ctx, "public", nil)
+	if err != nil {
+		return err
+	}
+	for _, entity := range entities.GetEntities() {
+		fmt.Println(entity)
+	}
+	return nil
+})
+```
 
-Please note that we have a [code of conduct](https://github.com/polypheny/Admin/blob/master/CODE_OF_CONDUCT.md). Please follow it in all your interactions with the project. 
+## Testing
 
+```sh
+go test -race ./...
+go vet ./...
+```
 
+To run the integration tests, set `POLYPHENY_TEST_DSN` to a test instance
+that supports Prism 2.2. The tests create and remove their own fixtures.
 
+```sh
+POLYPHENY_TEST_DSN='localhost:20590,pa:' go test -count=1 -run '^TestIntegration' ./...
+```
+
+## Resources
+
+- [Go package documentation](https://pkg.go.dev/github.com/polypheny/Polypheny-Go-Driver)
+- [Prism protocol documentation](https://docs.polypheny.com/en/latest/query_interfaces/prism/protocol)
+- [Open Go driver issues](https://github.com/polypheny/Polypheny-DB/labels/A-golang)
+- [Polypheny project and contribution guidelines](https://github.com/polypheny/Admin)
+- [Code of conduct](https://github.com/polypheny/Admin/blob/master/CODE_OF_CONDUCT.md)
 
 ## License
-The Apache 2.0 License
+
+[Apache License 2.0](LICENSE)

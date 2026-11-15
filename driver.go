@@ -1,9 +1,9 @@
 package polypheny
 
 import (
+	"context"
 	sql "database/sql"
 	driver "database/sql/driver"
-	context "golang.org/x/net/context"
 	strings "strings"
 )
 
