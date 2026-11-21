@@ -11,13 +11,14 @@
 
 Connect to Polypheny-DB from Go using `database/sql`. The driver supports SQL
 queries, positional parameters, and transactions. The raw connection provides
-MQL queries and Prism entity metadata.
+MQL and Cypher queries, and Prism namespace and entity metadata.
 
 ## Installation
 
 Use Go 1.23 or newer and a Polypheny server with a compatible Prism 2.x
-interface. The driver includes the generated Go bindings from the Prism 2.2 release.
-Document collection metadata requires server-side Prism 2.2 support.
+interface. The driver includes the generated Go bindings from the Prism 2.3 release.
+Document collection metadata requires server-side Prism 2.2 support. The Cypher
+API targets the graph support in Polypheny's Prism 2.3 implementation.
 
 ```sh
 go get github.com/polypheny/Polypheny-Go-Driver
@@ -109,6 +110,19 @@ return conn.Raw(func(raw any) error {
 })
 ```
 
+## Cypher
+
+Use `ExecuteCypherContext(ctx, namespace, query)` inside `(*sql.Conn).Raw`.
+It returns a `*prism.StatementResult` with an update count or a fully
+collected frame. Read `GetGraphFrame()` for graph-only projections and
+`GetRelationalFrame()` for scalar or mixed projections. Mixed rows retain
+column order and typed Prism values, including nested graph values.
+`SearchNamespaces` can filter to the `GRAPH` model, and `SearchEntities`
+returns graph markers for a graph namespace.
+
+See the [Go driver reference](https://docs.polypheny.com/en/latest/drivers/go)
+for a complete Cypher example.
+
 ## Testing
 
 ```sh
@@ -117,7 +131,7 @@ go vet ./...
 ```
 
 To run the integration tests, set `POLYPHENY_TEST_DSN` to a test instance
-that supports Prism 2.2. The tests create and remove their own fixtures.
+that supports Prism 2.3. The tests create and remove their own fixtures.
 
 ```sh
 POLYPHENY_TEST_DSN='localhost:20590,pa:' go test -count=1 -run '^TestIntegration' ./...

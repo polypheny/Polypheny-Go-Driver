@@ -4,4 +4,4 @@ package prism
 const MajorVersion = 2
 
 // MinorVersion is the minor component of the API version.
-const MinorVersion = 2
+const MinorVersion = 3
