@@ -7,8 +7,8 @@ if [[ $# -gt 1 || ( $# -eq 1 && $1 != --check ) ]]; then
     exit 2
 fi
 
-version=2.3
-sha256=71f2472222a5771b130cb2b696f59172304f5f7faf09b6054cc2563fdaca3fcd
+version=2.4
+sha256=e6b6b685f73d65c8ed0781458a909c002143c943382a4f8ca60e9bf234fa9b0a
 release_url="https://github.com/polypheny/Polypheny-Prism-API/releases/download/${version}/go-api-files-${version}.tar.gz"
 repo_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 target="$repo_dir/prism"

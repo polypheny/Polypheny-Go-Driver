@@ -2,7 +2,6 @@ package polypheny
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/polypheny/Polypheny-Go-Driver/prism"
@@ -32,12 +31,9 @@ func TestCypherPreservesTypedGraphCellsAcrossPages(t *testing.T) {
 	next := &prism.Frame{IsLast: true, Result: &prism.Frame_RelationalFrame{RelationalFrame: &prism.RelationalFrame{
 		Rows: []*prism.Row{secondRow},
 	}}}
-	client, finished := serveCypherPages(t, first, next, false)
+	client := serveCypherFetch(t, first, &prism.Response{Type: &prism.Response_Frame{Frame: next}}, false)
 	result, err := client.ExecuteCypherContext(context.Background(), "sample", "MATCH (n) RETURN n")
 	if err != nil {
-		t.Fatal(err)
-	}
-	if err := <-finished; err != nil {
 		t.Fatal(err)
 	}
 	first.IsLast = true
@@ -50,80 +46,45 @@ func TestCypherPreservesTypedGraphCellsAcrossPages(t *testing.T) {
 func TestCypherRollsBackBeforeClosingUnexpectedPage(t *testing.T) {
 	first := &prism.Frame{Result: &prism.Frame_GraphFrame{GraphFrame: &prism.GraphFrame{}}}
 	next := &prism.Frame{Result: &prism.Frame_RelationalFrame{RelationalFrame: &prism.RelationalFrame{}}}
-	client, finished := serveCypherPages(t, first, next, true)
+	client := serveCypherFetch(t, first, &prism.Response{Type: &prism.Response_Frame{Frame: next}}, true)
 	result, err := client.ExecuteCypherContext(context.Background(), "sample", "MATCH (n) RETURN n")
 	if result != nil || err == nil || err.Error() != "expected a Prism graph result frame" {
 		t.Fatalf("unexpected result %v, error %v", result, err)
-	}
-	if err := <-finished; err != nil {
-		t.Fatal(err)
 	}
 	if !client.IsValid() {
 		t.Fatal("expected the connection to remain usable after rollback and close")
 	}
 }
 
-func serveCypherPages(t *testing.T, first, next *prism.Frame, rollback bool) (*PolyphenyConn, <-chan error) {
+func TestCypherFetchPreservesServerError(t *testing.T) {
+	const message = "cannot fetch the next Cypher result page"
+	first := &prism.Frame{Result: &prism.Frame_GraphFrame{GraphFrame: &prism.GraphFrame{}}}
+	next := serverError(message, &prism.ErrorDetails{State: proto.String("XX000"), ErrorCode: proto.Int32(17)})
+	client := serveCypherFetch(t, first, next, true)
+	result, err := client.ExecuteCypherContext(context.Background(), "sample", "MATCH (n) RETURN n")
+	if result != nil {
+		t.Errorf("ExecuteCypherContext returned %v, want nil result", result)
+	}
+	assertClientError(t, err, message, "XX000", 17, true)
+	if !client.IsValid() {
+		t.Fatal("the connection should remain usable after rollback and close")
+	}
+}
+
+func serveCypherFetch(t *testing.T, first *prism.Frame, next *prism.Response, rollback bool) *PolyphenyConn {
 	t.Helper()
-	client, server := protocolPipe(t)
-	finished := make(chan error, 1)
-	go func() {
-		const statementID = 42
-		type step struct {
-			match func(*prism.Request) bool
-			reply *prism.Response
-		}
-		steps := []step{
-			{
-				match: func(r *prism.Request) bool {
-					q := r.GetExecuteUnparameterizedStatementRequest()
-					return q.GetLanguageName() == "cypher" && q.GetNamespaceName() == "sample" && q.GetStatement() == "MATCH (n) RETURN n"
-				},
-				reply: &prism.Response{Type: &prism.Response_StatementResponse{
-					StatementResponse: &prism.StatementResponse{StatementId: statementID, Result: &prism.StatementResult{Frame: first}},
-				}},
-			},
-			{
-				match: func(r *prism.Request) bool { return r.GetFetchRequest().GetStatementId() == statementID },
-				reply: &prism.Response{Type: &prism.Response_Frame{Frame: next}},
-			},
-		}
-		if rollback {
-			steps = append(steps, step{
-				match: func(r *prism.Request) bool { return r.GetRollbackRequest() != nil },
-				reply: &prism.Response{Type: &prism.Response_RollbackResponse{RollbackResponse: &prism.RollbackResponse{}}},
-			})
-		}
-		steps = append(steps, step{
-			match: func(r *prism.Request) bool { return r.GetCloseStatementRequest().GetStatementId() == statementID },
-			reply: &prism.Response{Type: &prism.Response_CloseStatementResponse{CloseStatementResponse: &prism.CloseStatementResponse{}}},
-		})
-		for i, step := range steps {
-			data, err := server.recv(8)
-			if err != nil {
-				finished <- err
-				return
-			}
-			request := new(prism.Request)
-			if err := proto.Unmarshal(data, request); err != nil {
-				finished <- err
-				return
-			}
-			if !step.match(request) {
-				finished <- fmt.Errorf("unexpected Cypher request at step %d: %v", i, request)
-				return
-			}
-			step.reply.Id, step.reply.Last = request.GetId(), true
-			data, err = proto.Marshal(step.reply)
-			if err == nil {
-				err = server.send(data, 8)
-			}
-			if err != nil {
-				finished <- err
-				return
-			}
-		}
-		finished <- nil
-	}()
-	return client, finished
+	const statementID = 42
+	steps := []protocolStep{
+		replyTo(func(r *prism.Request) bool {
+			q := r.GetExecuteUnparameterizedStatementRequest()
+			return q.GetLanguageName() == "cypher" && q.GetNamespaceName() == "sample" && q.GetStatement() == "MATCH (n) RETURN n"
+		}, &prism.Response{Type: &prism.Response_StatementResponse{
+			StatementResponse: &prism.StatementResponse{StatementId: statementID, Result: &prism.StatementResult{Frame: first}},
+		}}),
+		replyTo(func(r *prism.Request) bool { return r.GetFetchRequest().GetStatementId() == statementID }, next),
+	}
+	if rollback {
+		steps = append(steps, rollbackStep())
+	}
+	return serveProtocol(t, append(steps, closeStatementStep(statementID))...)
 }

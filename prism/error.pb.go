@@ -33,9 +33,9 @@ type ErrorDetails struct {
 
 	//  A numeric code representing the specific error encountered. This code can be used programmatically to handle specific error cases.
 	ErrorCode *int32 `protobuf:"varint,1,opt,name=error_code,json=errorCode,proto3,oneof" json:"error_code,omitempty"`
-	// An optional state description in the form of an identifier that provides further context about the error.
+	// A five-character SQLSTATE, including implementation-defined states.
 	State *string `protobuf:"bytes,2,opt,name=state,proto3,oneof" json:"state,omitempty"`
-	// A human-readable message describing the error in detail. This message offers clients a clear understanding of the issue.
+	// The same human-readable message as in ErrorResponse.message.
 	Message *string `protobuf:"bytes,3,opt,name=message,proto3,oneof" json:"message,omitempty"`
 }
 

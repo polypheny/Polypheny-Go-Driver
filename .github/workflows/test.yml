@@ -32,7 +32,7 @@ jobs:
       - run: go test -race ./...
 
   integration:
-    name: Prism 2.3 integration
+    name: Prism 2.4 integration
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -45,14 +45,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: polypheny/Polypheny-DB
-          ref: ebcf8e5b09cbae409526c017f509c7a55d07b0a4
+          ref: 01a2e438d761190e889f1a9f91426d3264b3e6d8
           path: polypheny-db
           persist-credentials: false
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - name: Build the Prism 2.3 server
+      - name: Build the Prism 2.4 server
         working-directory: polypheny-db
         run: |
           ./gradlew :dbms:shadowJar assemblePlugins -PwithoutpullingUi=true --console=plain

@@ -7,6 +7,11 @@ Source code is also available at: https://github.com/polypheny/Polypheny-Go-Driv
 
 # Release Notes
 
+## Unreleased
+
+* Update the bundled Go bindings to Prism 2.4.
+* Add `SQLState()` and `ErrorCode()` to `*ClientError` for structured server errors.
+
 
 ## 0.0.0
 ### 04 July 2023
