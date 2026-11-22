@@ -404,10 +404,11 @@ func (conn *PolyphenyConn) exchange(ctx context.Context, request *prism.Request)
 				return &ClientError{message: fmt.Sprintf("Prism response ID %d does not match request ID %d", response.GetId(), request.Id)}
 			}
 			if serverErr := response.GetErrorResponse(); serverErr != nil {
+				clientErr := &ClientError{message: serverErr.GetMessage()}
 				if !response.GetLast() {
 					_ = conn.close()
+					return clientErr
 				}
-				clientErr := &ClientError{message: serverErr.GetMessage()}
 				if details := serverErr.GetDetails(); details != nil {
 					clientErr.sqlState = details.GetState()
 					clientErr.errorCode = details.GetErrorCode()
