@@ -407,7 +407,13 @@ func (conn *PolyphenyConn) exchange(ctx context.Context, request *prism.Request)
 				if !response.GetLast() {
 					_ = conn.close()
 				}
-				return &ClientError{message: serverErr.GetMessage()}
+				clientErr := &ClientError{message: serverErr.GetMessage()}
+				if details := serverErr.GetDetails(); details != nil {
+					clientErr.sqlState = details.GetState()
+					clientErr.errorCode = details.GetErrorCode()
+					clientErr.hasErrorCode = details.ErrorCode != nil
+				}
+				return clientErr
 			}
 			responses = append(responses, response)
 			if response.GetLast() {
