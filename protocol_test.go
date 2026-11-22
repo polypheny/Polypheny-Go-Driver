@@ -91,8 +91,9 @@ func TestCancelFramedRequest(t *testing.T) {
 }
 
 type protocolStep struct {
-	match   func(*prism.Request) bool
-	replies []*prism.Response
+	match       func(*prism.Request) bool
+	replies     []*prism.Response
+	nonterminal bool
 }
 
 func replyTo(match func(*prism.Request) bool, replies ...*prism.Response) protocolStep {
@@ -132,7 +133,7 @@ func runProtocolSteps(server *PolyphenyConn, steps []protocolStep) error {
 			if reply.Id == 0 {
 				reply.Id = request.GetId()
 			}
-			reply.Last = i == len(step.replies)-1
+			reply.Last = !step.nonterminal && i == len(step.replies)-1
 			data, err := proto.Marshal(reply)
 			if err != nil {
 				return fmt.Errorf("encode Prism reply at step %d: %w", index+1, err)
@@ -217,6 +218,28 @@ func TestMismatchedResponseIDHasNoServerDetails(t *testing.T) {
 	assertClientError(t, client.Ping(context.Background()), "Prism response ID 2 does not match request ID 1", "", 0, false)
 	if client.IsValid() {
 		t.Fatal("a connection with mismatched response IDs must not be reused")
+	}
+}
+
+func TestNonterminalServerErrorHasNoDetails(t *testing.T) {
+	const message = "duplicate key value"
+	step := replyTo(isPing, serverError(message, &prism.ErrorDetails{
+		State: proto.String("23505"), ErrorCode: proto.Int32(17),
+	}))
+	step.nonterminal = true
+	client, server := protocolPipe(t)
+	finished := make(chan error, 1)
+	go func() { finished <- runProtocolSteps(server, []protocolStep{step}) }()
+
+	assertClientError(t, client.Ping(context.Background()), message, "", 0, false)
+	if err := <-finished; err != nil {
+		t.Fatal(err)
+	}
+	if client.IsValid() {
+		t.Fatal("a connection with a nonterminal error response must not be reused")
+	}
+	if _, err := server.recv(8); !errors.Is(err, io.EOF) {
+		t.Fatalf("server read after the error returned %v, want EOF", err)
 	}
 }
 
