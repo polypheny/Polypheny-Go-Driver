@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0 (unreleased)
+## v0.3.0 - 2026-11-23
 
 - Bundle the official Prism 2.4 Go bindings.
 - Add `SQLState()` and `ErrorCode()` to `*ClientError` for structured server errors. Use `errors.As` to access the metadata. An explicit error code of `0` is reported as present.
