@@ -6,6 +6,24 @@ import (
 	"github.com/polypheny/Polypheny-Go-Driver/prism"
 )
 
+// SetClientInfoPropertiesContext sets Prism client properties for this session.
+// Set CypherResultFormat to relational to retain columns and row boundaries
+// for graph-only Cypher projections on supported servers.
+func (conn *PolyphenyConn) SetClientInfoPropertiesContext(ctx context.Context, properties map[string]string) error {
+	response, err := conn.call(ctx, &prism.Request{
+		Type: &prism.Request_SetClientInfoPropertiesRequest{
+			SetClientInfoPropertiesRequest: &prism.ClientInfoProperties{Properties: properties},
+		},
+	})
+	if err != nil {
+		return err
+	}
+	if response.GetSetClientInfoPropertiesResponse() == nil {
+		return &ClientError{message: "Prism server did not confirm client information properties"}
+	}
+	return nil
+}
+
 // SearchNamespaces lists namespaces matching the optional name pattern and
 // model. Common model values are "RELATIONAL", "DOCUMENT", and "GRAPH".
 // A nil filter matches all values for that filter.

@@ -16,12 +16,26 @@ import (
 //
 // Call this method inside (*sql.Conn).Raw. As with other driver.Conn
 // operations, do not use the connection concurrently.
-func (conn *PolyphenyConn) ExecuteCypherContext(ctx context.Context, namespace, query string) (result *prism.StatementResult, err error) {
+func (conn *PolyphenyConn) ExecuteCypherContext(ctx context.Context, namespace, query string) (*prism.StatementResult, error) {
+	return conn.ExecuteCypherWithParametersContext(ctx, namespace, query, nil)
+}
+
+// ExecuteCypherWithParametersContext runs one Cypher statement with named
+// Prism parameters. Map keys are the parameter names without the leading dollar
+// sign. A nil map uses unparameterized execution.
+//
+// Call this method inside (*sql.Conn).Raw, like ExecuteCypherContext.
+func (conn *PolyphenyConn) ExecuteCypherWithParametersContext(ctx context.Context, namespace, query string, parameters map[string]*prism.ProtoValue) (result *prism.StatementResult, err error) {
 	var namespaceName *string
 	if namespace != "" {
 		namespaceName = &namespace
 	}
-	statementID, result, err := conn.execute(ctx, "cypher", query, namespaceName)
+	var statementID int32
+	if parameters == nil {
+		statementID, result, err = conn.execute(ctx, "cypher", query, namespaceName)
+	} else {
+		statementID, result, err = conn.executeNamedCypher(ctx, namespaceName, query, parameters)
+	}
 	if statementID != 0 {
 		defer conn.finishCypherStatement(statementID, &err)
 	}
@@ -37,6 +51,49 @@ func (conn *PolyphenyConn) ExecuteCypherContext(ctx context.Context, namespace, 
 	}
 	frame.IsLast = true
 	return result, nil
+}
+
+func (conn *PolyphenyConn) executeNamedCypher(ctx context.Context, namespace *string, query string, parameters map[string]*prism.ProtoValue) (int32, *prism.StatementResult, error) {
+	for name, parameter := range parameters {
+		if name == "" || parameter.GetValue() == nil {
+			return 0, nil, &ClientError{message: "each Cypher parameter needs a name and a Prism value"}
+		}
+	}
+	response, err := conn.call(ctx, &prism.Request{
+		Type: &prism.Request_PrepareNamedStatementRequest{
+			PrepareNamedStatementRequest: &prism.PrepareStatementRequest{
+				LanguageName:  "cypher",
+				Statement:     query,
+				NamespaceName: namespace,
+			},
+		},
+	})
+	if err != nil {
+		return 0, nil, err
+	}
+	signature := response.GetPreparedStatementSignature()
+	if signature == nil || signature.GetStatementId() <= 0 {
+		_ = conn.close()
+		return 0, nil, &ClientError{message: "Prism server did not return a valid prepared statement signature"}
+	}
+	id := signature.GetStatementId()
+	response, err = conn.call(ctx, &prism.Request{
+		Type: &prism.Request_ExecuteNamedStatementRequest{
+			ExecuteNamedStatementRequest: &prism.ExecuteNamedStatementRequest{
+				StatementId: id,
+				Parameters:  &prism.NamedParameters{Parameters: parameters},
+			},
+		},
+	})
+	if err != nil {
+		return id, nil, err
+	}
+	result := response.GetStatementResult()
+	if result == nil {
+		_ = conn.close()
+		return id, nil, &ClientError{message: "Prism server did not return a prepared statement result"}
+	}
+	return id, result, nil
 }
 
 func (conn *PolyphenyConn) collectCypherFrames(ctx context.Context, statementID int32, first *prism.Frame) error {

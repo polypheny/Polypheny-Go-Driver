@@ -8,6 +8,40 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func TestCypherNamedParametersAndRelationalFormat(t *testing.T) {
+	const (
+		id    = 17
+		query = "RETURN $1 AS value"
+	)
+	parameter := &prism.ProtoValue{Value: &prism.ProtoValue_Integer{Integer: &prism.ProtoInteger{Integer: 42}}}
+	frame := &prism.Frame{IsLast: true, Result: &prism.Frame_RelationalFrame{RelationalFrame: &prism.RelationalFrame{
+		ColumnMeta: []*prism.ColumnMeta{{ColumnLabel: "value"}},
+		Rows:       []*prism.Row{{Values: []*prism.ProtoValue{parameter}}},
+	}}}
+	client := serveProtocol(t,
+		replyTo(func(r *prism.Request) bool {
+			return r.GetSetClientInfoPropertiesRequest().GetProperties()["CypherResultFormat"] == "relational"
+		}, &prism.Response{Type: &prism.Response_SetClientInfoPropertiesResponse{SetClientInfoPropertiesResponse: &prism.ClientInfoPropertiesResponse{}}}),
+		replyTo(func(r *prism.Request) bool {
+			prepare := r.GetPrepareNamedStatementRequest()
+			return prepare.GetLanguageName() == "cypher" && prepare.GetNamespaceName() == "sample" && prepare.GetStatement() == query
+		}, &prism.Response{Type: &prism.Response_PreparedStatementSignature{PreparedStatementSignature: &prism.PreparedStatementSignature{StatementId: id}}}),
+		replyTo(func(r *prism.Request) bool {
+			execute := r.GetExecuteNamedStatementRequest()
+			return execute.GetStatementId() == id && proto.Equal(execute.GetParameters().GetParameters()["1"], parameter)
+		}, &prism.Response{Type: &prism.Response_StatementResult{StatementResult: &prism.StatementResult{Frame: frame}}}),
+		closeStatementStep(id),
+	)
+	ctx := context.Background()
+	if err := client.SetClientInfoPropertiesContext(ctx, map[string]string{"CypherResultFormat": "relational"}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := client.ExecuteCypherWithParametersContext(ctx, "sample", query, map[string]*prism.ProtoValue{"1": parameter})
+	if err != nil || !proto.Equal(result.GetFrame(), frame) {
+		t.Fatalf("ExecuteCypherWithParametersContext returned %v, %v", result, err)
+	}
+}
+
 func TestCypherPreservesTypedGraphCellsAcrossPages(t *testing.T) {
 	node := &prism.ProtoNode{Id: "node", Labels: []string{"Person"}}
 	edge := &prism.ProtoEdge{Id: "edge", Left: "node", Right: "other", Direction: prism.ProtoEdge_LEFT_TO_RIGHT}

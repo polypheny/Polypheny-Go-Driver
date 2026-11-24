@@ -135,6 +135,12 @@ It returns a `*prism.StatementResult` with an update count or a fully
 collected frame. Read `GetGraphFrame()` for graph-only projections and
 `GetRelationalFrame()` for scalar or mixed projections. Mixed rows retain
 column order and typed Prism values, including nested graph values.
+Use `ExecuteCypherWithParametersContext(ctx, namespace, query, parameters)`
+to bind named parameters on servers that support prepared Cypher. Supply a
+`map[string]*prism.ProtoValue` keyed by each placeholder name without `$`.
+On supported servers, use `SetClientInfoPropertiesContext` to set
+`CypherResultFormat` to `relational` to keep rows and columns for all Cypher
+queries, including graph-only projections.
 `SearchNamespaces` can filter to the `GRAPH` model, and `SearchEntities`
 returns graph markers for a graph namespace.
 
